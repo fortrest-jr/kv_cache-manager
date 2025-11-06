@@ -1,8 +1,12 @@
 // KV Cache Manager для SillyTavern
 // Расширение для управления KV-кешем llama.cpp
 
-(function() {
+(async function() {
     'use strict';
+
+    // Импортируем необходимые функции из extensions.js
+    const { getContext } = await import('../../extensions.js');
+    const context = getContext();
 
     const extensionName = 'kv-cache-manager';
     const defaultSettings = {
@@ -68,8 +72,13 @@
         });
 
         document.addEventListener('click', function(e) {
-            if (e.target.id === 'kv-cache-save-button') {
+            // Проверяем как сам элемент, так и его родителя (для случаев, когда клик на label или span внутри)
+            const target = e.target;
+            const buttonId = target.id || target.closest('input')?.id || target.closest('button')?.id;
+            
+            if (buttonId === 'kv-cache-save-button') {
                 e.preventDefault();
+                e.stopPropagation();
                 const userName = document.getElementById('kv-cache-save-name')?.value;
                 if (userName) {
                     manualSaveCache(userName).then(() => {
@@ -80,14 +89,21 @@
                         toastr.error('Введите имя для сохранения');
                     }
                 }
-            } else if (e.target.id === 'kv-cache-load-button') {
+            } else if (buttonId === 'kv-cache-load-button') {
                 e.preventDefault();
+                e.stopPropagation();
                 loadCacheDialog();
-            } else if (e.target.id === 'kv-cache-save-now-button') {
+            } else if (buttonId === 'kv-cache-save-now-button') {
                 e.preventDefault();
-                forceAutoSave();
+                e.stopPropagation();
+                forceAutoSave().catch((error) => {
+                    console.error('[KV Cache Manager] Ошибка при принудительном сохранении:', error);
+                    if (settings.showNotifications) {
+                        toastr.error('Ошибка при сохранении кеша: ' + (error.message || error), 'KV Cache Manager');
+                    }
+                });
             }
-        });
+        }, true); // Используем capture phase для более надежного перехвата
     }
 
     // Загрузка настроек в UI
@@ -384,25 +400,11 @@
 
     // Получение URL llama.cpp сервера из настроек SillyTavern
     function getLlamaUrl() {
-        // Пытаемся получить URL из настроек подключения SillyTavern
+        // Используем main_api из глобального контекста SillyTavern
         if (typeof main_api !== 'undefined' && main_api) {
-            // Если есть main_api, берем его URL
-            const apiUrl = main_api;
             // Извлекаем базовый URL (без /api)
-            if (apiUrl.includes('/api')) {
-                return apiUrl.replace('/api', '');
-            }
-            return apiUrl;
-        }
-        
-        // Пытаемся получить из настроек API
-        if (typeof api_server !== 'undefined' && api_server) {
-            return api_server;
-        }
-        
-        // Пытаемся получить из extension_settings
-        if (typeof extension_settings !== 'undefined' && extension_settings.api_server) {
-            return extension_settings.api_server;
+            const url = main_api.includes('/api') ? main_api.replace('/api', '') : main_api;
+            return url;
         }
         
         // Fallback на стандартный URL
@@ -538,16 +540,19 @@
     // Сохранение кеша для слота
     async function saveSlotCache(slotId, filename) {
         const llamaUrl = getLlamaUrl();
+        const url = `${llamaUrl}/slots/${slotId}?action=save`;
+        const requestBody = { filename: filename };
+        
         try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 минут таймаут
             
-            const response = await fetch(`${llamaUrl}/slots/${slotId}?action=save`, {
+            const response = await fetch(url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ filename: filename }),
+                body: JSON.stringify(requestBody),
                 signal: controller.signal
             });
             
@@ -555,16 +560,22 @@
             
             if (!response.ok) {
                 const errorText = await response.text();
-                console.error(`[KV Cache Manager] Ошибка сохранения кеша слота ${slotId}: ${response.status} ${errorText}`);
+                if (settings.showNotifications) {
+                    toastr.error(`Ошибка сохранения слота ${slotId}: ${response.status} ${errorText}`, 'KV Cache Manager');
+                }
                 return false;
             }
             
             return true;
         } catch (e) {
             if (e.name === 'AbortError') {
-                console.error(`[KV Cache Manager] Таймаут при сохранении кеша слота ${slotId}`);
+                if (settings.showNotifications) {
+                    toastr.error(`Таймаут при сохранении кеша слота ${slotId}`, 'KV Cache Manager');
+                }
             } else {
-                console.error(`[KV Cache Manager] Ошибка сохранения кеша слота ${slotId}:`, e);
+                if (settings.showNotifications) {
+                    toastr.error(`Ошибка сохранения слота ${slotId}: ${e.message}`, 'KV Cache Manager');
+                }
             }
             return false;
         }
@@ -800,25 +811,22 @@
         }
 
         const chatId = getCurrentChatId();
-        console.log(`[KV Cache Manager] Принудительное сохранение кеша для чата ${chatId}`);
-
-        // Проверка доступности сервера
-        const isServerAvailable = await checkServerAvailability();
-        if (!isServerAvailable) {
-            console.warn('[KV Cache Manager] Сервер llama.cpp недоступен');
-            if (settings.showNotifications) {
-                toastr.error('Сервер llama.cpp недоступен');
-            }
-            return;
+        const llamaUrl = getLlamaUrl();
+        
+        if (settings.showNotifications) {
+            toastr.info('Начинаю сохранение кеша...', 'KV Cache Manager');
         }
 
         const slots = await getActiveSlots();
         if (slots.length === 0) {
-            console.log('[KV Cache Manager] Нет активных слотов для сохранения');
             if (settings.showNotifications) {
                 toastr.warning('Нет активных слотов для сохранения');
             }
             return;
+        }
+        
+        if (settings.showNotifications) {
+            toastr.info(`Найдено ${slots.length} активных слотов`, 'KV Cache Manager');
         }
 
         let savedCount = 0;

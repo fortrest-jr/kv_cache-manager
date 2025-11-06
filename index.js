@@ -1,1317 +1,153 @@
 // KV Cache Manager для SillyTavern
 // Расширение для управления KV-кешем llama.cpp
+// Этап 1: Загрузка UI и вывод тостов при нажатии на кнопки
 
-(async function() {
-    'use strict';
+// Импортируем необходимые функции
+import { extension_settings, getContext, loadExtensionSettings } from "../../../extensions.js";
+import { saveSettingsDebounced } from "../../../../script.js";
 
-    // Импортируем необходимые функции из extensions.js
-    const { getContext } = await import('../../extensions.js');
-    const context = getContext();
+// Имя расширения должно совпадать с именем папки
+const extensionName = "kv-cache-manager";
+const extensionFolderPath = `scripts/extensions/third-party/${extensionName}`;
+const extensionSettings = extension_settings[extensionName];
 
-    const extensionName = 'kv-cache-manager';
-    const defaultSettings = {
-        enabled: true,
-        saveInterval: 5,
-        autoLoadOnChatSwitch: true,
-        maxFiles: 10,
-        showNotifications: true,
-        validateCache: true
-    };
+const defaultSettings = {
+    enabled: true,
+    saveInterval: 5,
+    autoLoadOnChatSwitch: true,
+    maxFiles: 10,
+    showNotifications: true,
+    validateCache: true
+};
 
-    let settings = { ...defaultSettings };
-    let messageCounters = {}; // { chatId: count }
-    let currentChatId = null;
-
-    // Инициализация расширения
-    function init() {
-        console.log('[KV Cache Manager] Инициализация расширения');
-        
-        // Загрузка настроек
-        loadSettings();
-        
-        // Инициализация UI
-        initUI();
-        
-        // Подписка на события
-        subscribeToEvents();
-        
-        console.log('[KV Cache Manager] Расширение инициализировано');
+// Загрузка настроек
+async function loadSettings() {
+    // Создаем настройки, если их нет
+    extension_settings[extensionName] = extension_settings[extensionName] || {};
+    if (Object.keys(extension_settings[extensionName]).length === 0) {
+        Object.assign(extension_settings[extensionName], defaultSettings);
     }
 
-    // Инициализация UI
-    function initUI() {
-        // Инициализация обработчиков событий UI
-        setupUIHandlers();
+    // Обновляем настройки в UI
+    const settings = extension_settings[extensionName];
+    $("#kv-cache-enabled").prop("checked", settings.enabled).trigger("input");
+    $("#kv-cache-save-interval").val(settings.saveInterval).trigger("input");
+    $("#kv-cache-max-files").val(settings.maxFiles).trigger("input");
+    $("#kv-cache-auto-load").prop("checked", settings.autoLoadOnChatSwitch).trigger("input");
+    $("#kv-cache-show-notifications").prop("checked", settings.showNotifications).trigger("input");
+    $("#kv-cache-validate").prop("checked", settings.validateCache).trigger("input");
+}
+
+// Показ toast-уведомления
+function showToast(type, message, title = 'KV Cache Manager') {
+    if (typeof toastr === 'undefined') {
+        console.log(`[KV Cache Manager] ${title}: ${message}`);
+        return;
     }
 
-    // Настройка обработчиков событий UI
-    function setupUIHandlers() {
-        // Используем делегирование событий для элементов, которые могут быть еще не загружены
-        document.addEventListener('change', function(e) {
-            if (e.target.id === 'kv-cache-enabled') {
-                settings.enabled = e.target.checked;
-                saveSettings();
-                updateUI();
-            } else if (e.target.id === 'kv-cache-save-interval') {
-                settings.saveInterval = parseInt(e.target.value) || 5;
-                saveSettings();
-                updateUI();
-            } else if (e.target.id === 'kv-cache-max-files') {
-                settings.maxFiles = parseInt(e.target.value) || 10;
-                saveSettings();
-            } else if (e.target.id === 'kv-cache-auto-load') {
-                settings.autoLoadOnChatSwitch = e.target.checked;
-                saveSettings();
-            } else if (e.target.id === 'kv-cache-show-notifications') {
-                settings.showNotifications = e.target.checked;
-                saveSettings();
-            } else if (e.target.id === 'kv-cache-validate') {
-                settings.validateCache = e.target.checked;
-                saveSettings();
-            }
-        });
-
-        document.addEventListener('click', function(e) {
-            // Проверяем как сам элемент, так и его родителя (для случаев, когда клик на label или span внутри)
-            const target = e.target;
-            const buttonId = target.id || target.closest('input')?.id || target.closest('button')?.id;
-            
-            if (buttonId === 'kv-cache-save-button') {
-                e.preventDefault();
-                e.stopPropagation();
-                const userName = document.getElementById('kv-cache-save-name')?.value;
-                if (userName) {
-                    manualSaveCache(userName).then(() => {
-                        updateStatistics();
-                    });
-                } else {
-                    if (settings.showNotifications) {
-                        toastr.error('Введите имя для сохранения');
-                    }
-                }
-            } else if (buttonId === 'kv-cache-load-button') {
-                e.preventDefault();
-                e.stopPropagation();
-                loadCacheDialog();
-            } else if (buttonId === 'kv-cache-save-now-button') {
-                e.preventDefault();
-                e.stopPropagation();
-                forceAutoSave().catch((error) => {
-                    console.error('[KV Cache Manager] Ошибка при принудительном сохранении:', error);
-                    if (settings.showNotifications) {
-                        toastr.error('Ошибка при сохранении кеша: ' + (error.message || error), 'KV Cache Manager');
-                    }
-                });
-            }
-        }, true); // Используем capture phase для более надежного перехвата
+    const settings = extension_settings[extensionName] || defaultSettings;
+    if (!settings.showNotifications) {
+        return;
     }
 
-    // Загрузка настроек в UI
-    function loadSettingsToUI() {
-        const enabledCheckbox = document.getElementById('kv-cache-enabled');
-        if (enabledCheckbox) enabledCheckbox.checked = settings.enabled;
-
-        const saveIntervalInput = document.getElementById('kv-cache-save-interval');
-        if (saveIntervalInput) saveIntervalInput.value = settings.saveInterval;
-
-        const maxFilesInput = document.getElementById('kv-cache-max-files');
-        if (maxFilesInput) maxFilesInput.value = settings.maxFiles;
-
-        const autoLoadCheckbox = document.getElementById('kv-cache-auto-load');
-        if (autoLoadCheckbox) autoLoadCheckbox.checked = settings.autoLoadOnChatSwitch;
-
-        const showNotificationsCheckbox = document.getElementById('kv-cache-show-notifications');
-        if (showNotificationsCheckbox) showNotificationsCheckbox.checked = settings.showNotifications;
-
-        const validateCheckbox = document.getElementById('kv-cache-validate');
-        if (validateCheckbox) validateCheckbox.checked = settings.validateCache;
-
-        updateUI();
-        updateStatistics();
+    switch (type) {
+        case 'success':
+            toastr.success(message, title);
+            break;
+        case 'error':
+            toastr.error(message, title);
+            break;
+        case 'warning':
+            toastr.warning(message, title);
+            break;
+        case 'info':
+        default:
+            toastr.info(message, title);
+            break;
     }
-
-    // Обновление UI
-    function updateUI() {
-        const chatId = getCurrentChatId();
-        const count = messageCounters[chatId] || 0;
-        const remaining = Math.max(0, settings.saveInterval - count);
-        
-        const nextSaveElement = document.getElementById('kv-cache-next-save');
-        if (nextSaveElement) {
-            if (settings.enabled) {
-                nextSaveElement.textContent = `Следующее сохранение через: ${remaining} сообщений`;
-            } else {
-                nextSaveElement.textContent = 'Автосохранение отключено';
-            }
-        }
-    }
-
-    // Получение всех файлов кеша для текущего чата
-    async function getAllCacheFiles() {
-        const chatName = getCurrentChatName().replace(/[^a-zA-Z0-9_-]/g, '_');
-        const pattern = `.*${chatName}.*_slot\\d+_\\d+\\.bin$`;
-        const regex = new RegExp(pattern);
-        
-        try {
-            // Пытаемся получить список файлов через API SillyTavern
-            if (typeof extension_api !== 'undefined' && extension_api.getCacheFiles) {
-                const files = await extension_api.getCacheFiles();
-                return files.filter(f => regex.test(f.name));
-            }
-        } catch (e) {
-            console.debug('[KV Cache Manager] Не удалось получить список файлов через API:', e);
-        }
-        
-        // Fallback: возвращаем пустой массив
-        return [];
-    }
-
-    // Обновление статистики
-    async function updateStatistics() {
-        try {
-            const files = await getAllCacheFiles();
-            
-            // Разделяем на автосохранения и ручные сохранения
-            const autoSaveFiles = files.filter(f => {
-                const chatName = getCurrentChatName().replace(/[^a-zA-Z0-9_-]/g, '_');
-                return f.name.startsWith(`${chatName}_slot`) && !f.name.includes('_');
-            });
-            
-            // Находим последнее сохранение
-            let lastSave = null;
-            if (files.length > 0) {
-                // Сортируем по timestamp
-                files.sort((a, b) => {
-                    const timestampA = extractTimestampFromFilename(a.name);
-                    const timestampB = extractTimestampFromFilename(b.name);
-                    if (!timestampA || !timestampB) return 0;
-                    return timestampB.localeCompare(timestampA); // Новые первыми
-                });
-                lastSave = files[0];
-            }
-            
-            // Обновляем информацию о последнем сохранении
-            const lastSaveInfo = document.getElementById('kv-cache-last-save-info');
-            if (lastSaveInfo) {
-                if (lastSave) {
-                    const timestamp = extractTimestampFromFilename(lastSave.name);
-                    const slotIds = [];
-                    // Подсчитываем количество уникальных слотов в последнем сохранении
-                    const timestampFiles = files.filter(f => {
-                        const fTimestamp = extractTimestampFromFilename(f.name);
-                        return fTimestamp === timestamp;
-                    });
-                    for (const file of timestampFiles) {
-                        const slotId = extractSlotIdFromFilename(file.name);
-                        if (slotId !== null && !slotIds.includes(slotId)) {
-                            slotIds.push(slotId);
-                        }
-                    }
-                    const dateStr = timestamp ? formatTimestamp(timestamp) : 'Неизвестно';
-                    const sizeStr = lastSave.size ? formatFileSize(lastSave.size) : 'Неизвестно';
-                    lastSaveInfo.innerHTML = `
-                        <strong>Имя файла:</strong> ${lastSave.name}<br>
-                        <strong>Количество слотов:</strong> ${slotIds.length > 0 ? slotIds.length : 'Неизвестно'}<br>
-                        <strong>Размер:</strong> ${sizeStr}<br>
-                        <strong>Дата/время:</strong> ${dateStr}
-                    `;
-                } else {
-                    lastSaveInfo.textContent = 'Нет сохранений';
-                }
-            }
-            
-            // Обновляем общую статистику
-            const statsInfo = document.getElementById('kv-cache-stats-info');
-            if (statsInfo) {
-                const totalSize = files.reduce((sum, f) => sum + (f.size || 0), 0);
-                statsInfo.innerHTML = `
-                    <strong>Всего файлов:</strong> ${files.length}<br>
-                    <strong>Общий размер:</strong> ${formatFileSize(totalSize)}
-                `;
-            }
-        } catch (e) {
-            console.error('[KV Cache Manager] Ошибка при обновлении статистики:', e);
-            const lastSaveInfo = document.getElementById('kv-cache-last-save-info');
-            if (lastSaveInfo) {
-                lastSaveInfo.textContent = 'Ошибка загрузки данных';
-            }
-            const statsInfo = document.getElementById('kv-cache-stats-info');
-            if (statsInfo) {
-                statsInfo.textContent = 'Ошибка загрузки данных';
-            }
-        }
-    }
-
-    // Форматирование timestamp (формат: YYYYMMDDHHMMSS)
-    function formatTimestamp(timestamp) {
-        if (!timestamp || timestamp.length !== 14) {
-            return timestamp || 'Неизвестно';
-        }
-        try {
-            const year = timestamp.substring(0, 4);
-            const month = timestamp.substring(4, 6);
-            const day = timestamp.substring(6, 8);
-            const hour = timestamp.substring(8, 10);
-            const minute = timestamp.substring(10, 12);
-            const second = timestamp.substring(12, 14);
-            return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
-        } catch (e) {
-            return timestamp;
-        }
-    }
-
-    // Форматирование размера файла
-    function formatFileSize(bytes) {
-        if (!bytes || bytes === 0) return '0 B';
-        const k = 1024;
-        const sizes = ['B', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
-    }
-
-    // Диалог загрузки кеша
-    async function loadCacheDialog() {
-        try {
-            const files = await getAllCacheFiles();
-            
-            if (files.length === 0) {
-                if (settings.showNotifications) {
-                    toastr.warning('Нет сохраненных файлов кеша для этого чата');
-                }
-                return;
-            }
-            
-            // Сортируем файлы по timestamp (новые первыми)
-            files.sort((a, b) => {
-                const timestampA = extractTimestampFromFilename(a.name);
-                const timestampB = extractTimestampFromFilename(b.name);
-                if (!timestampA || !timestampB) return 0;
-                return timestampB.localeCompare(timestampA);
-            });
-            
-            // Группируем файлы по timestamp (все слоты одного сохранения)
-            const timestampGroups = {};
-            for (const file of files) {
-                const timestamp = extractTimestampFromFilename(file.name);
-                if (timestamp) {
-                    if (!timestampGroups[timestamp]) {
-                        timestampGroups[timestamp] = [];
-                    }
-                    timestampGroups[timestamp].push(file);
-                }
-            }
-            
-            // Показываем диалог выбора
-            const timestamps = Object.keys(timestampGroups).sort().reverse();
-            if (timestamps.length === 0) {
-                if (settings.showNotifications) {
-                    toastr.warning('Не удалось определить сохранения');
-                }
-                return;
-            }
-            
-            // Если только одно сохранение, загружаем его автоматически
-            if (timestamps.length === 1) {
-                const filesToLoad = timestampGroups[timestamps[0]];
-                await loadCacheFiles(filesToLoad);
-                return;
-            }
-            
-            // Показываем список для выбора (упрощенная версия - загружаем последнее)
-            // В полной версии можно использовать модальное окно
-            const latestTimestamp = timestamps[0];
-            const filesToLoad = timestampGroups[latestTimestamp];
-            await loadCacheFiles(filesToLoad);
-            
-        } catch (e) {
-            console.error('[KV Cache Manager] Ошибка при загрузке диалога:', e);
-            if (settings.showNotifications) {
-                toastr.error('Ошибка при загрузке списка файлов');
-            }
-        }
-    }
-
-    // Загрузка файлов кеша
-    async function loadCacheFiles(files) {
-        if (!files || files.length === 0) {
-            if (settings.showNotifications) {
-                toastr.warning('Нет файлов для загрузки');
-            }
-            return false;
-        }
-        
-        console.log(`[KV Cache Manager] Загрузка ${files.length} файлов кеша`);
-        
-        let loadedCount = 0;
-        const slotMap = {}; // Группируем файлы по слотам
-        
-        // Группируем файлы по слотам
-        for (const file of files) {
-            const slotId = extractSlotIdFromFilename(file.name);
-            if (slotId !== null) {
-                if (!slotMap[slotId]) {
-                    slotMap[slotId] = [];
-                }
-                slotMap[slotId].push(file);
-            }
-        }
-        
-        // Загружаем файлы для каждого слота
-        for (const slotId in slotMap) {
-            const slotFiles = slotMap[slotId];
-            // Берем последний файл для слота (самый новый)
-            const fileToLoad = slotFiles[slotFiles.length - 1];
-            if (await loadSlotCache(parseInt(slotId), fileToLoad.name)) {
-                loadedCount++;
-                console.log(`[KV Cache Manager] Загружен кеш для слота ${slotId}: ${fileToLoad.name}`);
-            }
-        }
-        
-        if (loadedCount > 0) {
-            if (settings.showNotifications) {
-                toastr.success(`Загружено ${loadedCount} из ${Object.keys(slotMap).length} слотов`);
-            }
-            await updateStatistics();
-            return true;
-        } else {
-            if (settings.showNotifications) {
-                toastr.error('Не удалось загрузить кеш');
-            }
-            return false;
-        }
-    }
-
-    // Загрузка настроек из SillyTavern
-    function loadSettings() {
-        if (typeof extension_settings !== 'undefined' && extension_settings[extensionName]) {
-            settings = { ...defaultSettings, ...extension_settings[extensionName] };
-        }
-    }
-
-    // Сохранение настроек в SillyTavern
-    function saveSettings() {
-        if (typeof extension_settings !== 'undefined') {
-            extension_settings[extensionName] = settings;
-            if (typeof saveSettingsDebounced !== 'undefined') {
-                saveSettingsDebounced();
-            }
-        }
-    }
-
-    // Получение URL llama.cpp сервера из настроек SillyTavern
-    function getLlamaUrl() {
-        // Используем main_api из глобального контекста SillyTavern
-        if (typeof main_api !== 'undefined' && main_api) {
-            // Извлекаем базовый URL (без /api)
-            const url = main_api.includes('/api') ? main_api.replace('/api', '') : main_api;
-            return url;
-        }
-        
-        // Fallback на стандартный URL
-        return 'http://127.0.0.1:8080';
-    }
-
-    // Проверка доступности llama.cpp сервера
-    async function checkServerAvailability() {
-        const llamaUrl = getLlamaUrl();
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 секунд таймаут
-            
-            const response = await fetch(`${llamaUrl}/health`, {
-                method: 'GET',
-                signal: controller.signal
-            });
-            
-            clearTimeout(timeoutId);
-            return response.ok;
-        } catch (e) {
-            if (e.name !== 'AbortError') {
-                console.debug('[KV Cache Manager] Сервер недоступен:', e);
-            }
-            return false;
-        }
-    }
-
-    // Получение имени текущего чата
-    function getCurrentChatName() {
-        if (typeof chat !== 'undefined' && chat) {
-            return chat.name || chat.title || 'chat';
-        }
-        return 'chat';
-    }
-
-    // Получение ID текущего чата
-    function getCurrentChatId() {
-        if (typeof chat !== 'undefined' && chat && chat.id) {
-            return String(chat.id);
-        }
-        return 'default';
-    }
-
-    // Получение всех активных слотов
-    async function getActiveSlots() {
-        const llamaUrl = getLlamaUrl();
-        const slots = [];
-        
-        try {
-            // Пытаемся получить список слотов через /slots
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000);
-            
-            const response = await fetch(`${llamaUrl}/slots`, {
-                method: 'GET',
-                signal: controller.signal
-            });
-            
-            clearTimeout(timeoutId);
-            
-            if (response.ok) {
-                const data = await response.json();
-                if (Array.isArray(data)) {
-                    for (const slot of data) {
-                        const slotId = typeof slot === 'object' ? slot.id : slot;
-                        if (await isSlotValid(slotId)) {
-                            slots.push(slotId);
-                        }
-                    }
-                    return slots;
-                } else if (typeof data === 'object') {
-                    // Если это объект с ключами-номерами слотов
-                    for (const slotIdStr in data) {
-                        const slotId = parseInt(slotIdStr);
-                        if (!isNaN(slotId) && await isSlotValid(slotId)) {
-                            slots.push(slotId);
-                        }
-                    }
-                    return slots;
-                }
-            }
-        } catch (e) {
-            if (e.name !== 'AbortError') {
-                console.debug('[KV Cache Manager] Не удалось получить список слотов через /slots:', e);
-            }
-        }
-        
-        // Fallback: перебираем слоты вручную (до 16 слотов)
-        // Для групповых чатов может быть больше слотов, но начинаем с 16
-        for (let slotId = 0; slotId < 16; slotId++) {
-            if (await isSlotValid(slotId)) {
-                slots.push(slotId);
-            }
-        }
-        
-        return slots;
-    }
-
-    // Проверка валидности слота
-    async function isSlotValid(slotId) {
-        if (!settings.validateCache) {
-            return true; // Если проверка отключена, считаем валидным
-        }
-        
-        const llamaUrl = getLlamaUrl();
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 секунд таймаут
-            
-            const response = await fetch(`${llamaUrl}/slots/${slotId}`, {
-                method: 'GET',
-                signal: controller.signal
-            });
-            
-            clearTimeout(timeoutId);
-            
-            if (response.ok) {
-                const slotInfo = await response.json();
-                const nCtxUsed = slotInfo.n_ctx_used || 0;
-                const nPromptTokens = slotInfo.n_prompt_tokens || 0;
-                return nCtxUsed > 0 || nPromptTokens > 0;
-            }
-        } catch (e) {
-            if (e.name !== 'AbortError') {
-                console.debug(`[KV Cache Manager] Ошибка проверки слота ${slotId}:`, e);
-            }
-        }
-        
-        return false;
-    }
-
-    // Сохранение кеша для слота
-    async function saveSlotCache(slotId, filename) {
-        const llamaUrl = getLlamaUrl();
-        const url = `${llamaUrl}/slots/${slotId}?action=save`;
-        const requestBody = { filename: filename };
-        
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 минут таймаут
-            
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(requestBody),
-                signal: controller.signal
-            });
-            
-            clearTimeout(timeoutId);
-            
-            if (!response.ok) {
-                const errorText = await response.text();
-                if (settings.showNotifications) {
-                    toastr.error(`Ошибка сохранения слота ${slotId}: ${response.status} ${errorText}`, 'KV Cache Manager');
-                }
-                return false;
-            }
-            
-            return true;
-        } catch (e) {
-            if (e.name === 'AbortError') {
-                if (settings.showNotifications) {
-                    toastr.error(`Таймаут при сохранении кеша слота ${slotId}`, 'KV Cache Manager');
-                }
-            } else {
-                if (settings.showNotifications) {
-                    toastr.error(`Ошибка сохранения слота ${slotId}: ${e.message}`, 'KV Cache Manager');
-                }
-            }
-            return false;
-        }
-    }
-
-    // Загрузка кеша для слота
-    async function loadSlotCache(slotId, filename) {
-        const llamaUrl = getLlamaUrl();
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 минут таймаут
-            
-            const response = await fetch(`${llamaUrl}/slots/${slotId}?action=restore`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ filename: filename }),
-                signal: controller.signal
-            });
-            
-            clearTimeout(timeoutId);
-            
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error(`[KV Cache Manager] Ошибка загрузки кеша слота ${slotId}: ${response.status} ${errorText}`);
-                return false;
-            }
-            
-            return true;
-        } catch (e) {
-            if (e.name === 'AbortError') {
-                console.error(`[KV Cache Manager] Таймаут при загрузке кеша слота ${slotId}`);
-            } else {
-                console.error(`[KV Cache Manager] Ошибка загрузки кеша слота ${slotId}:`, e);
-            }
-            return false;
-        }
-    }
-
-    // Извлечение номера слота из имени файла
-    function extractSlotIdFromFilename(filename) {
-        const match = filename.match(/_slot(\d+)_/);
-        return match ? parseInt(match[1]) : null;
-    }
-
-    // Формирование имени файла для автосохранения
-    function generateAutoSaveFilename(slotId) {
-        const chatName = getCurrentChatName().replace(/[^a-zA-Z0-9_-]/g, '_');
-        const timestamp = new Date().toISOString().replace(/[-:T]/g, '').split('.')[0].replace(/(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/, '$1$2$3$4$5$6');
-        return `${chatName}_slot${slotId}_${timestamp}.bin`;
-    }
-
-    // Формирование имени файла для ручного сохранения
-    function generateManualSaveFilename(userName, slotId) {
-        const chatName = getCurrentChatName().replace(/[^a-zA-Z0-9_-]/g, '_');
-        const safeUserName = userName.replace(/[^a-zA-Z0-9_-]/g, '_');
-        const timestamp = new Date().toISOString().replace(/[-:T]/g, '').split('.')[0].replace(/(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/, '$1$2$3$4$5$6');
-        return `${safeUserName}_${chatName}_slot${slotId}_${timestamp}.bin`;
-    }
-
-    // Принудительное сохранение автосохранения (без проверки счетчика)
-    async function forceAutoSave() {
-        console.log('[KV Cache Manager] Принудительное сохранение автосохранения');
-        
-        const chatId = getCurrentChatId();
-        
-        // Проверка доступности сервера
-        const isServerAvailable = await checkServerAvailability();
-        if (!isServerAvailable) {
-            console.warn('[KV Cache Manager] Сервер llama.cpp недоступен');
-            if (settings.showNotifications) {
-                toastr.error('Сервер llama.cpp недоступен');
-            }
-            return;
-        }
-        
-        const slots = await getActiveSlots();
-        if (slots.length === 0) {
-            console.log('[KV Cache Manager] Нет активных слотов для сохранения');
-            if (settings.showNotifications) {
-                toastr.warning('Нет активных слотов для сохранения');
-            }
-            return;
-        }
-
-        let savedCount = 0;
-        let errors = [];
-        
-        for (const slotId of slots) {
-            try {
-                const filename = generateAutoSaveFilename(slotId);
-                if (await saveSlotCache(slotId, filename)) {
-                    savedCount++;
-                } else {
-                    errors.push(`Слот ${slotId}`);
-                }
-            } catch (e) {
-                console.error(`[KV Cache Manager] Ошибка при сохранении слота ${slotId}:`, e);
-                errors.push(`Слот ${slotId}: ${e.message}`);
-            }
-        }
-
-        if (savedCount > 0) {
-            // Сброс счетчика
-            messageCounters[chatId] = 0;
-            
-            // Ротация файлов
-            try {
-                await rotateAutoSaveFiles();
-            } catch (e) {
-                console.error('[KV Cache Manager] Ошибка при ротации файлов:', e);
-            }
-            
-            // Обновление статистики
-            try {
-                await updateStatistics();
-            } catch (e) {
-                console.error('[KV Cache Manager] Ошибка при обновлении статистики:', e);
-            }
-            
-            updateUI();
-            
-            if (settings.showNotifications) {
-                if (errors.length > 0) {
-                    toastr.warning(`Сохранено ${savedCount} из ${slots.length} слотов. Ошибки: ${errors.join(', ')}`);
-                } else {
-                    toastr.success(`Сохранено ${savedCount} слотов`);
-                }
-            }
-        } else {
-            if (settings.showNotifications) {
-                toastr.error(`Не удалось сохранить кеш. Ошибки: ${errors.join(', ')}`);
-            }
-        }
-    }
-
-    // Автоматическое сохранение кеша
-    async function autoSaveCache() {
-        if (!settings.enabled) {
-            return;
-        }
-
-        const chatId = getCurrentChatId();
-        const count = messageCounters[chatId] || 0;
-        
-        if (count < settings.saveInterval) {
-            return;
-        }
-
-        console.log(`[KV Cache Manager] Автосохранение кеша для чата ${chatId} (сообщений: ${count})`);
-        
-        // Проверка доступности сервера
-        const isServerAvailable = await checkServerAvailability();
-        if (!isServerAvailable) {
-            console.warn('[KV Cache Manager] Сервер llama.cpp недоступен, пропускаем сохранение');
-            if (settings.showNotifications) {
-                toastr.warning('Сервер llama.cpp недоступен, сохранение пропущено');
-            }
-            // Не сбрасываем счетчик, чтобы попробовать снова позже
-            return;
-        }
-        
-        const slots = await getActiveSlots();
-        if (slots.length === 0) {
-            console.log('[KV Cache Manager] Нет активных слотов для сохранения');
-            // Сбрасываем счетчик даже если нет слотов, чтобы не накапливать
-            messageCounters[chatId] = 0;
-            updateUI();
-            return;
-        }
-
-        let savedCount = 0;
-        let errors = [];
-        
-        for (const slotId of slots) {
-            try {
-                const filename = generateAutoSaveFilename(slotId);
-                if (await saveSlotCache(slotId, filename)) {
-                    savedCount++;
-                } else {
-                    errors.push(`Слот ${slotId}`);
-                }
-            } catch (e) {
-                console.error(`[KV Cache Manager] Ошибка при сохранении слота ${slotId}:`, e);
-                errors.push(`Слот ${slotId}: ${e.message}`);
-            }
-        }
-
-        if (savedCount > 0) {
-            // Сброс счетчика
-            messageCounters[chatId] = 0;
-            
-            // Ротация файлов
-            try {
-                await rotateAutoSaveFiles();
-            } catch (e) {
-                console.error('[KV Cache Manager] Ошибка при ротации файлов:', e);
-            }
-            
-            // Обновление статистики
-            try {
-                await updateStatistics();
-            } catch (e) {
-                console.error('[KV Cache Manager] Ошибка при обновлении статистики:', e);
-            }
-            
-            if (settings.showNotifications) {
-                if (errors.length > 0) {
-                    toastr.warning(`Сохранено ${savedCount} из ${slots.length} слотов. Ошибки: ${errors.join(', ')}`);
-                } else {
-                    toastr.success(`Сохранено ${savedCount} слотов`);
-                }
-            }
-        } else {
-            // Если не удалось сохранить, не сбрасываем счетчик
-            // чтобы попробовать снова при следующем сообщении
-            if (settings.showNotifications) {
-                toastr.error(`Не удалось сохранить кеш. Ошибки: ${errors.join(', ')}`);
-            }
-        }
-        
-        updateUI();
-    }
-
-    // Принудительное сохранение кеша (без проверки счетчика сообщений)
-    async function forceAutoSave() {
-        if (!settings.enabled) {
-            if (settings.showNotifications) {
-                toastr.warning('Автосохранение отключено');
-            }
-            return;
-        }
-
-        const chatId = getCurrentChatId();
-        const llamaUrl = getLlamaUrl();
-        
-        if (settings.showNotifications) {
-            toastr.info('Начинаю сохранение кеша...', 'KV Cache Manager');
-        }
-
-        const slots = await getActiveSlots();
-        if (slots.length === 0) {
-            if (settings.showNotifications) {
-                toastr.warning('Нет активных слотов для сохранения');
-            }
-            return;
-        }
-        
-        if (settings.showNotifications) {
-            toastr.info(`Найдено ${slots.length} активных слотов`, 'KV Cache Manager');
-        }
-
-        let savedCount = 0;
-        let errors = [];
-
-        for (const slotId of slots) {
-            try {
-                const filename = generateAutoSaveFilename(slotId);
-                if (await saveSlotCache(slotId, filename)) {
-                    savedCount++;
-                } else {
-                    errors.push(`Слот ${slotId}`);
-                }
-            } catch (e) {
-                console.error(`[KV Cache Manager] Ошибка при сохранении слота ${slotId}:`, e);
-                errors.push(`Слот ${slotId}: ${e.message}`);
-            }
-        }
-
-        if (savedCount > 0) {
-            // Сброс счетчика при принудительном сохранении
-            messageCounters[chatId] = 0;
-
-            // Ротация файлов
-            try {
-                await rotateAutoSaveFiles();
-            } catch (e) {
-                console.error('[KV Cache Manager] Ошибка при ротации файлов:', e);
-            }
-
-            // Обновление статистики
-            try {
-                await updateStatistics();
-            } catch (e) {
-                console.error('[KV Cache Manager] Ошибка при обновлении статистики:', e);
-            }
-
-            updateUI();
-
-            if (settings.showNotifications) {
-                if (errors.length > 0) {
-                    toastr.warning(`Сохранено ${savedCount} из ${slots.length} слотов. Ошибки: ${errors.join(', ')}`);
-                } else {
-                    toastr.success(`Сохранено ${savedCount} слотов`);
-                }
-            }
-        } else {
-            if (settings.showNotifications) {
-                toastr.error(`Не удалось сохранить кеш. Ошибки: ${errors.join(', ')}`);
-            }
-        }
-    }
-
-    // Ручное сохранение с именем
-    async function manualSaveCache(userName) {
-        if (!userName || !userName.trim()) {
-            if (settings.showNotifications) {
-                toastr.error('Необходимо указать имя для сохранения');
-            }
-            return false;
-        }
-
-        console.log(`[KV Cache Manager] Ручное сохранение кеша с именем "${userName}"`);
-        
-        // Проверка доступности сервера
-        const isServerAvailable = await checkServerAvailability();
-        if (!isServerAvailable) {
-            if (settings.showNotifications) {
-                toastr.error('Сервер llama.cpp недоступен');
-            }
-            return false;
-        }
-        
-        // Получаем все активные слоты (для групповых чатов может быть несколько)
-        const slots = await getActiveSlots();
-        if (slots.length === 0) {
-            if (settings.showNotifications) {
-                toastr.warning('Нет активных слотов для сохранения');
-            }
-            return false;
-        }
-
-        console.log(`[KV Cache Manager] Найдено ${slots.length} активных слотов: ${slots.join(', ')}`);
-
-        let savedCount = 0;
-        let errors = [];
-        
-        for (const slotId of slots) {
-            try {
-                const filename = generateManualSaveFilename(userName.trim(), slotId);
-                if (await saveSlotCache(slotId, filename)) {
-                    savedCount++;
-                } else {
-                    errors.push(`Слот ${slotId}`);
-                }
-            } catch (e) {
-                console.error(`[KV Cache Manager] Ошибка при сохранении слота ${slotId}:`, e);
-                errors.push(`Слот ${slotId}: ${e.message}`);
-            }
-        }
-
-        if (savedCount > 0) {
-            // Обновление статистики после сохранения
-            try {
-                await updateStatistics();
-            } catch (e) {
-                console.error('[KV Cache Manager] Ошибка при обновлении статистики:', e);
-            }
-            
-            if (settings.showNotifications) {
-                if (errors.length > 0) {
-                    toastr.warning(`Сохранено ${savedCount} из ${slots.length} слотов с именем "${userName}". Ошибки: ${errors.join(', ')}`);
-                } else {
-                    toastr.success(`Сохранено ${savedCount} из ${slots.length} слотов с именем "${userName}"`);
-                }
-            }
-            return true;
-        } else {
-            if (settings.showNotifications) {
-                toastr.error(`Не удалось сохранить кеш. Ошибки: ${errors.join(', ')}`);
-            }
-            return false;
-        }
-    }
-
-    // Получение списка файлов автосохранения для текущего чата
-    async function getAutoSaveFiles() {
-        const chatName = getCurrentChatName().replace(/[^a-zA-Z0-9_-]/g, '_');
-        const pattern = `${chatName}_slot\\d+_\\d+\\.bin$`;
-        const regex = new RegExp(pattern);
-        
-        // Пытаемся получить список файлов через API SillyTavern
-        // Если API недоступно, возвращаем пустой массив
-        try {
-            // В SillyTavern может быть API для получения списка файлов кеша
-            // Пока используем заглушку - в реальной реализации нужно будет
-            // использовать API SillyTavern для получения списка файлов
-            if (typeof extension_api !== 'undefined' && extension_api.getCacheFiles) {
-                const files = await extension_api.getCacheFiles();
-                return files.filter(f => regex.test(f.name) && !f.name.startsWith('backup_'));
-            }
-        } catch (e) {
-            console.debug('[KV Cache Manager] Не удалось получить список файлов через API:', e);
-        }
-        
-        // Fallback: возвращаем пустой массив
-        // В реальной реализации нужно будет использовать API SillyTavern
-        return [];
-    }
-
-    // Ротация файлов автосохранения
-    async function rotateAutoSaveFiles() {
-        if (settings.maxFiles <= 0) {
-            return; // Ротация отключена
-        }
-
-        try {
-            const files = await getAutoSaveFiles();
-            
-            if (files.length <= settings.maxFiles) {
-                return; // Лимит не превышен
-            }
-
-            // Сортируем файлы по timestamp (из имени файла)
-            files.sort((a, b) => {
-                const timestampA = extractTimestampFromFilename(a.name);
-                const timestampB = extractTimestampFromFilename(b.name);
-                if (!timestampA || !timestampB) return 0;
-                return timestampA.localeCompare(timestampB);
-            });
-
-            // Удаляем самые старые файлы
-            const filesToDelete = files.slice(0, files.length - settings.maxFiles);
-            
-            for (const file of filesToDelete) {
-                try {
-                    // Удаление через API SillyTavern
-                    if (typeof extension_api !== 'undefined' && extension_api.deleteCacheFile) {
-                        await extension_api.deleteCacheFile(file.name);
-                        console.log(`[KV Cache Manager] Удален старый файл: ${file.name}`);
-                    }
-                } catch (e) {
-                    console.warn(`[KV Cache Manager] Не удалось удалить файл ${file.name}:`, e);
-                }
-            }
-        } catch (e) {
-            console.error('[KV Cache Manager] Ошибка при ротации файлов:', e);
-        }
-    }
-
-    // Извлечение timestamp из имени файла
-    function extractTimestampFromFilename(filename) {
-        const match = filename.match(/_(\d{14})\.bin$/);
-        return match ? match[1] : null;
-    }
-
-    // Автозагрузка кеша при переключении на чат
-    async function autoLoadCache() {
-        if (!settings.autoLoadOnChatSwitch) {
-            return;
-        }
-
-        const chatId = getCurrentChatId();
-        const chatName = getCurrentChatName();
-        
-        console.log(`[KV Cache Manager] Автозагрузка кеша для чата ${chatId} (${chatName})`);
-        
-        try {
-            const files = await getAllCacheFiles();
-            
-            if (files.length === 0) {
-                console.log('[KV Cache Manager] Нет сохраненных файлов для автозагрузки');
-                return;
-            }
-            
-            // Сортируем файлы по timestamp (новые первыми)
-            files.sort((a, b) => {
-                const timestampA = extractTimestampFromFilename(a.name);
-                const timestampB = extractTimestampFromFilename(b.name);
-                if (!timestampA || !timestampB) return 0;
-                return timestampB.localeCompare(timestampA);
-            });
-            
-            // Группируем файлы по timestamp (все слоты одного сохранения)
-            const timestampGroups = {};
-            for (const file of files) {
-                const timestamp = extractTimestampFromFilename(file.name);
-                if (timestamp) {
-                    if (!timestampGroups[timestamp]) {
-                        timestampGroups[timestamp] = [];
-                    }
-                    timestampGroups[timestamp].push(file);
-                }
-            }
-            
-            // Загружаем последнее сохранение (самый новый timestamp)
-            const timestamps = Object.keys(timestampGroups).sort().reverse();
-            if (timestamps.length > 0) {
-                const latestTimestamp = timestamps[0];
-                const filesToLoad = timestampGroups[latestTimestamp];
-                await loadCacheFiles(filesToLoad);
-            }
-        } catch (e) {
-            console.error('[KV Cache Manager] Ошибка при автозагрузке кеша:', e);
-        }
-    }
-
-    // Обработка завершения генерации сообщения
-    function handleMessageComplete() {
-        const chatId = getCurrentChatId();
-        messageCounters[chatId] = (messageCounters[chatId] || 0) + 1;
-        updateUI();
-        
-        // Проверяем, нужно ли сохранять
-        const count = messageCounters[chatId] || 0;
-        if (count >= settings.saveInterval) {
-            autoSaveCache();
-        }
-    }
-
-    // Подписка на события
-    function subscribeToEvents() {
-        // Событие завершения генерации сообщения
-        // В SillyTavern обычно используется eventSource для SSE
-        if (typeof eventSource !== 'undefined') {
-            eventSource.addEventListener('message', (event) => {
-                try {
-                    const data = JSON.parse(event.data);
-                    // Проверяем различные типы событий завершения генерации
-                    if (data.type === 'streamingComplete' || 
-                        data.type === 'messageComplete' ||
-                        (data.type === 'message' && data.finish_reason) ||
-                        data.event === 'streamingComplete' ||
-                        data.event === 'messageComplete') {
-                        handleMessageComplete();
-                    }
-                } catch (e) {
-                    // Игнорируем ошибки парсинга
-                }
-            });
-        }
-
-        // Альтернативный способ через события DOM
-        document.addEventListener('messageComplete', handleMessageComplete);
-        document.addEventListener('streamingComplete', handleMessageComplete);
-
-        // Событие переключения чата
-        // Отслеживаем изменения chat.id через polling
-        let lastChatId = getCurrentChatId();
-        setInterval(() => {
-            const currentChatId = getCurrentChatId();
-            if (currentChatId !== lastChatId) {
-                lastChatId = currentChatId;
-                // Сброс счетчика при переключении чата
-                messageCounters[currentChatId] = messageCounters[currentChatId] || 0;
-                autoLoadCache();
-                updateUI();
-                updateStatistics();
-            }
-        }, 1000);
-
-        // Альтернативный способ через jQuery события (если доступны)
-        if (typeof jQuery !== 'undefined') {
-            jQuery(document).on('chatChanged', () => {
-                const chatId = getCurrentChatId();
-                messageCounters[chatId] = messageCounters[chatId] || 0;
-                autoLoadCache();
-                updateUI();
-                updateStatistics();
-            });
-            
-            // События завершения генерации через jQuery
-            jQuery(document).on('messageComplete streamingComplete', handleMessageComplete);
-        }
-
-        // Событие через window
-        window.addEventListener('chatChanged', () => {
-            const chatId = getCurrentChatId();
-            messageCounters[chatId] = messageCounters[chatId] || 0;
-            autoLoadCache();
-            updateUI();
-            updateStatistics();
-        });
-        
-        window.addEventListener('messageComplete', handleMessageComplete);
-        window.addEventListener('streamingComplete', handleMessageComplete);
-    }
-
-    // Экспорт функций для использования в UI
-    window.kvCacheManager = {
-        settings: settings,
-        saveSettings: saveSettings,
-        loadSettings: loadSettings,
-        loadSettingsToUI: loadSettingsToUI,
-        updateUI: updateUI,
-        updateStatistics: updateStatistics,
-        manualSaveCache: manualSaveCache,
-        autoSaveCache: autoSaveCache,
-        autoLoadCache: autoLoadCache,
-        getActiveSlots: getActiveSlots,
-        getCurrentChatName: getCurrentChatName,
-        getCurrentChatId: getCurrentChatId
-    };
-
-    // Встроенный HTML для настроек (fallback)
-    const embeddedSettingsHtml = `<div class="kv-cache-manager-settings">
-    <div class="inline-drawer">
-        <div class="inline-drawer-toggle inline-drawer-header">
-            <b>KV Cache Manager</b>
-            <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
-        </div>
-        <div class="inline-drawer-content">
-            <div class="kv-cache-manager-section">
-                <h3>Автоматическое сохранение</h3>
-                <div class="kv-cache-manager-field flex-container">
-                    <input type="checkbox" id="kv-cache-enabled" />
-                    <label for="kv-cache-enabled">Включить автосохранение</label>
-                </div>
-                <div class="kv-cache-manager-field flex-container">
-                    <label for="kv-cache-save-interval">Сохранять каждые N сообщений:</label>
-                    <input type="number" id="kv-cache-save-interval" min="1" value="5" />
-                </div>
-                <div class="kv-cache-manager-field">
-                    <span id="kv-cache-next-save">Следующее сохранение через: - сообщений</span>
-                </div>
-                <div class="kv-cache-manager-field flex-container">
-                    <input id="kv-cache-save-now-button" class="menu_button" type="submit" value="Сохранить сейчас" />
-                </div>
-            </div>
-
-            <hr class="sysHR" />
-
-            <div class="kv-cache-manager-section">
-                <h3>Управление кешем</h3>
-                <div class="kv-cache-manager-field flex-container">
-                    <label for="kv-cache-save-name">Имя для сохранения:</label>
-                    <input type="text" id="kv-cache-save-name" placeholder="Введите имя" />
-                </div>
-                <div class="kv-cache-manager-field flex-container">
-                    <input id="kv-cache-save-button" class="menu_button" type="submit" value="Сохранить с именем" />
-                </div>
-                <div class="kv-cache-manager-field flex-container">
-                    <input id="kv-cache-load-button" class="menu_button" type="submit" value="Загрузить кеш" />
-                </div>
-            </div>
-
-            <hr class="sysHR" />
-
-            <div class="kv-cache-manager-section">
-                <h3>Настройки ротации</h3>
-                <div class="kv-cache-manager-field flex-container">
-                    <label for="kv-cache-max-files">Максимум файлов на сессию (только для автосохранений):</label>
-                    <input type="number" id="kv-cache-max-files" min="1" value="10" />
-                </div>
-            </div>
-
-            <hr class="sysHR" />
-
-            <div class="kv-cache-manager-section">
-                <h3>Статистика и последнее сохранение</h3>
-                <div id="kv-cache-last-save" class="kv-cache-manager-info">
-                    <p><strong>Последнее сохранение:</strong></p>
-                    <p id="kv-cache-last-save-info">Нет данных</p>
-                </div>
-                <div id="kv-cache-statistics" class="kv-cache-manager-info">
-                    <p><strong>Статистика:</strong></p>
-                    <p id="kv-cache-stats-info">Нет данных</p>
-                </div>
-            </div>
-
-            <hr class="sysHR" />
-
-            <div class="kv-cache-manager-section">
-                <h3>Дополнительные настройки</h3>
-                <div class="kv-cache-manager-field flex-container">
-                    <input type="checkbox" id="kv-cache-auto-load" />
-                    <label for="kv-cache-auto-load">Автозагрузка при переключении на чат</label>
-                </div>
-                <div class="kv-cache-manager-field flex-container">
-                    <input type="checkbox" id="kv-cache-show-notifications" />
-                    <label for="kv-cache-show-notifications">Показывать уведомления</label>
-                </div>
-                <div class="kv-cache-manager-field flex-container">
-                    <input type="checkbox" id="kv-cache-validate" />
-                    <label for="kv-cache-validate">Проверять валидность кеша</label>
-                </div>
-            </div>
-
-            <hr class="sysHR" />
-        </div>
-    </div>
-</div>`;
-
-    // Добавление настроек расширения в UI
-    // Используем подход из примеров - вставляем HTML напрямую в контейнер настроек
-    function addSettingsToUI() {
-        // Ищем контейнер настроек расширений
-        // В SillyTavern настройки расширений обычно находятся в #extensions_settings
-        const settingsContainer = document.getElementById('extensions_settings');
-        
-        if (settingsContainer && !settingsContainer.querySelector('.kv-cache-manager-settings')) {
-            console.log('[KV Cache Manager] Добавляем настройки в UI');
-            settingsContainer.insertAdjacentHTML('beforeend', embeddedSettingsHtml);
-            loadSettingsToUI();
-            updateStatistics();
-        }
-    }
-    
-    // Пробуем добавить настройки сразу, если контейнер уже существует
-    if (document.readyState === 'complete' || document.readyState === 'interactive') {
-        setTimeout(addSettingsToUI, 100);
-    }
-    
-    // Слушаем изменения DOM для добавления настроек, когда контейнер появится
-    const observer = new MutationObserver(function(mutations) {
-        for (const mutation of mutations) {
-            if (mutation.addedNodes.length > 0) {
-                for (const node of mutation.addedNodes) {
-                    if (node.nodeType === 1 && (node.id === 'extensions_settings' || node.querySelector('#extensions_settings'))) {
-                        setTimeout(addSettingsToUI, 100);
-                    }
-                }
-            }
-        }
-    });
-    
-    observer.observe(document.body, {
-        childList: true,
-        subtree: true
-    });
-    
-    // Также слушаем клики на вкладку расширений
-    document.addEventListener('click', function(e) {
-        if (e.target && (e.target.textContent && e.target.textContent.includes('Extensions') || 
-                         e.target.closest('#extensions_settings'))) {
-            setTimeout(addSettingsToUI, 200);
-        }
-    }, true);
-
-    // Инициализация при загрузке
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
+}
+
+// Обработчики для чекбоксов и полей ввода
+function onEnabledChange(event) {
+    const value = Boolean($(event.target).prop("checked"));
+    extension_settings[extensionName].enabled = value;
+    saveSettingsDebounced();
+    showToast('success', `Автосохранение ${value ? 'включено' : 'отключено'}`);
+}
+
+function onSaveIntervalChange(event) {
+    const value = parseInt($(event.target).val()) || 5;
+    extension_settings[extensionName].saveInterval = value;
+    saveSettingsDebounced();
+    showToast('info', `Интервал сохранения установлен: ${value} сообщений`);
+}
+
+function onMaxFilesChange(event) {
+    const value = parseInt($(event.target).val()) || 10;
+    extension_settings[extensionName].maxFiles = value;
+    saveSettingsDebounced();
+    showToast('info', `Максимум файлов установлен: ${value}`);
+}
+
+function onAutoLoadChange(event) {
+    const value = Boolean($(event.target).prop("checked"));
+    extension_settings[extensionName].autoLoadOnChatSwitch = value;
+    saveSettingsDebounced();
+    showToast('success', `Автозагрузка ${value ? 'включена' : 'отключена'}`);
+}
+
+function onShowNotificationsChange(event) {
+    const value = Boolean($(event.target).prop("checked"));
+    extension_settings[extensionName].showNotifications = value;
+    saveSettingsDebounced();
+    showToast('success', `Уведомления ${value ? 'включены' : 'отключены'}`);
+}
+
+function onValidateChange(event) {
+    const value = Boolean($(event.target).prop("checked"));
+    extension_settings[extensionName].validateCache = value;
+    saveSettingsDebounced();
+    showToast('success', `Проверка валидности ${value ? 'включена' : 'отключена'}`);
+}
+
+// Обработчики для кнопок
+function onSaveButtonClick() {
+    const userName = $("#kv-cache-save-name").val();
+    if (userName && userName.trim()) {
+        showToast('info', `Кнопка "Сохранить с именем" нажата. Имя: ${userName}`);
     } else {
-        init();
+        showToast('error', 'Введите имя для сохранения');
     }
+}
 
-})();
+function onLoadButtonClick() {
+    showToast('info', 'Кнопка "Загрузить кеш" нажата');
+}
 
+function onSaveNowButtonClick() {
+    showToast('info', 'Кнопка "Сохранить сейчас" нажата');
+}
+
+// Функция вызывается при загрузке расширения
+jQuery(async () => {
+    // Загружаем HTML из файла
+    const settingsHtml = await $.get(`${extensionFolderPath}/settings.html`);
+
+    // Добавляем HTML в контейнер настроек
+    $("#extensions_settings").append(settingsHtml);
+
+    // Настраиваем обработчики событий
+    $("#kv-cache-enabled").on("input", onEnabledChange);
+    $("#kv-cache-save-interval").on("input", onSaveIntervalChange);
+    $("#kv-cache-max-files").on("input", onMaxFilesChange);
+    $("#kv-cache-auto-load").on("input", onAutoLoadChange);
+    $("#kv-cache-show-notifications").on("input", onShowNotificationsChange);
+    $("#kv-cache-validate").on("input", onValidateChange);
+    
+    $("#kv-cache-save-button").on("click", onSaveButtonClick);
+    $("#kv-cache-load-button").on("click", onLoadButtonClick);
+    $("#kv-cache-save-now-button").on("click", onSaveNowButtonClick);
+
+    // Загружаем настройки при старте
+    loadSettings();
+});

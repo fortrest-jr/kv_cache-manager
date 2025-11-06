@@ -662,17 +662,17 @@ async function onLoadButtonClick() {
     }
     
     // Получаем список сохранений из настроек
-    const savesList = getSavesList();
+    const saves = getSavesList();
     
-    if (!savesList || savesList.length === 0) {
+    if (!saves || saves.length === 0) {
         showToast('warning', 'Не найдено сохранений для загрузки. Сначала сохраните кеш.');
         return;
     }
     
-    showToast('info', `Найдено сохранений: ${savesList.length}`);
+    showToast('info', `Найдено сохранений: ${saves.length}`);
     
     // Группируем сохранения по имени чата и timestamp
-    const groups = groupSavesByChatAndTimestamp(savesList);
+    const groups = groupSavesByChatAndTimestamp(saves);
     const groupKeys = Object.keys(groups).sort().reverse(); // Сортируем по убыванию (новые первыми)
     
     if (groupKeys.length === 0) {
@@ -682,8 +682,75 @@ async function onLoadButtonClick() {
     
     showToast('info', `Найдено групп сохранений: ${groupKeys.length}`);
     
-    // Формируем список для выбора
-    const options = groupKeys.map((key, index) => {
+    // Создаем модальное окно для выбора сохранения
+    const modalId = 'kv-cache-load-modal';
+    let modal = $(`#${modalId}`);
+    
+    // Удаляем старое модальное окно, если есть
+    if (modal.length > 0) {
+        modal.remove();
+    }
+    
+    // Создаем новое модальное окно
+    modal = $(`
+        <div id="${modalId}" class="kv-cache-load-modal" style="
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        ">
+            <div style="
+                background: var(--SmartThemeBlurTintColor, #1e1e1e);
+                border: 1px solid var(--SmartThemeBorderColor, #333);
+                border-radius: 8px;
+                padding: 20px;
+                max-width: 600px;
+                max-height: 80vh;
+                overflow-y: auto;
+                width: 90%;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            ">
+                <h3 style="
+                    margin: 0 0 15px 0;
+                    color: var(--SmartThemeBodyColor, #fff);
+                    font-size: 1.2em;
+                ">Выберите сохранение для загрузки</h3>
+                <div id="kv-cache-saves-list" style="
+                    display: flex;
+                    flex-direction: column;
+                    gap: 10px;
+                    margin-bottom: 15px;
+                "></div>
+                <div style="
+                    display: flex;
+                    justify-content: flex-end;
+                    gap: 10px;
+                ">
+                    <button class="menu_button" id="kv-cache-load-cancel" style="
+                        background: var(--SmartThemeBlurTintColor, #2d2d2d);
+                        border: 1px solid var(--SmartThemeBorderColor, #555);
+                        color: var(--SmartThemeBodyColor, #fff);
+                        padding: 8px 16px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                    ">Отмена</button>
+                </div>
+            </div>
+        </div>
+    `);
+    
+    // Добавляем модальное окно в body
+    $('body').append(modal);
+    
+    // Заполняем список сохранений
+    const savesList = $('#kv-cache-saves-list');
+    groupKeys.forEach((key, index) => {
         const group = groups[key];
         const date = new Date(
             parseInt(group.timestamp.substring(0, 4)), // год
@@ -706,23 +773,58 @@ async function onLoadButtonClick() {
         });
         const slotsCount = group.files.length;
         const chatName = group.chatName;
-        return `${index + 1}. ${chatName} - ${dateStr} ${timeStr} (${slotsCount} слот${slotsCount !== 1 ? 'ов' : ''})`;
-    }).join('\n');
+        
+        const saveButton = $(`
+            <button class="menu_button kv-cache-save-item" data-key="${key}" style="
+                width: 100%;
+                text-align: left;
+                padding: 12px;
+                background: var(--SmartThemeBlurTintColor, #2d2d2d);
+                border: 1px solid var(--SmartThemeBorderColor, #555);
+                color: var(--SmartThemeBodyColor, #fff);
+                border-radius: 4px;
+                cursor: pointer;
+                transition: background 0.2s;
+            ">
+                <div style="font-weight: bold; margin-bottom: 4px;">${chatName}</div>
+                <div style="font-size: 0.9em; opacity: 0.8;">${dateStr} ${timeStr}</div>
+                <div style="font-size: 0.85em; opacity: 0.7; margin-top: 4px;">${slotsCount} слот${slotsCount !== 1 ? 'ов' : ''}</div>
+            </button>
+        `);
+        
+        // Обработчик клика на кнопку сохранения
+        saveButton.on('click', () => {
+            modal.remove();
+            loadSelectedSave(groups[key]);
+        });
+        
+        // Эффект при наведении
+        saveButton.on('mouseenter', function() {
+            $(this).css('background', 'var(--SmartThemeBlurTintColor, #3d3d3d)');
+        });
+        saveButton.on('mouseleave', function() {
+            $(this).css('background', 'var(--SmartThemeBlurTintColor, #2d2d2d)');
+        });
+        
+        savesList.append(saveButton);
+    });
     
-    const choice = prompt(`Выберите сохранение для загрузки:\n\n${options}\n\nВведите номер (1-${groupKeys.length}):`);
+    // Обработчик кнопки отмены
+    $('#kv-cache-load-cancel').on('click', () => {
+        modal.remove();
+    });
     
-    if (!choice || isNaN(choice)) {
-        return;
-    }
-    
-    const index = parseInt(choice, 10) - 1;
-    if (index < 0 || index >= groupKeys.length) {
-        showToast('error', 'Неверный номер');
-        return;
-    }
-    
-    const selectedGroup = groups[groupKeys[index]];
-    const filesToLoad = selectedGroup.files.map(f => ({
+    // Закрытие при клике вне модального окна
+    modal.on('click', (e) => {
+        if (e.target.id === modalId) {
+            modal.remove();
+        }
+    });
+}
+
+// Загрузка выбранного сохранения
+async function loadSelectedSave(group) {
+    const filesToLoad = group.files.map(f => ({
         filename: f.filename,
         slotId: f.slotId
     }));

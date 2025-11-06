@@ -83,6 +83,9 @@
             } else if (e.target.id === 'kv-cache-load-button') {
                 e.preventDefault();
                 loadCacheDialog();
+            } else if (e.target.id === 'kv-cache-save-now-button') {
+                e.preventDefault();
+                forceAutoSave();
             }
         });
     }
@@ -623,6 +626,82 @@
         return `${safeUserName}_${chatName}_slot${slotId}_${timestamp}.bin`;
     }
 
+    // Принудительное сохранение автосохранения (без проверки счетчика)
+    async function forceAutoSave() {
+        console.log('[KV Cache Manager] Принудительное сохранение автосохранения');
+        
+        const chatId = getCurrentChatId();
+        
+        // Проверка доступности сервера
+        const isServerAvailable = await checkServerAvailability();
+        if (!isServerAvailable) {
+            console.warn('[KV Cache Manager] Сервер llama.cpp недоступен');
+            if (settings.showNotifications) {
+                toastr.error('Сервер llama.cpp недоступен');
+            }
+            return;
+        }
+        
+        const slots = await getActiveSlots();
+        if (slots.length === 0) {
+            console.log('[KV Cache Manager] Нет активных слотов для сохранения');
+            if (settings.showNotifications) {
+                toastr.warning('Нет активных слотов для сохранения');
+            }
+            return;
+        }
+
+        let savedCount = 0;
+        let errors = [];
+        
+        for (const slotId of slots) {
+            try {
+                const filename = generateAutoSaveFilename(slotId);
+                if (await saveSlotCache(slotId, filename)) {
+                    savedCount++;
+                } else {
+                    errors.push(`Слот ${slotId}`);
+                }
+            } catch (e) {
+                console.error(`[KV Cache Manager] Ошибка при сохранении слота ${slotId}:`, e);
+                errors.push(`Слот ${slotId}: ${e.message}`);
+            }
+        }
+
+        if (savedCount > 0) {
+            // Сброс счетчика
+            messageCounters[chatId] = 0;
+            
+            // Ротация файлов
+            try {
+                await rotateAutoSaveFiles();
+            } catch (e) {
+                console.error('[KV Cache Manager] Ошибка при ротации файлов:', e);
+            }
+            
+            // Обновление статистики
+            try {
+                await updateStatistics();
+            } catch (e) {
+                console.error('[KV Cache Manager] Ошибка при обновлении статистики:', e);
+            }
+            
+            updateUI();
+            
+            if (settings.showNotifications) {
+                if (errors.length > 0) {
+                    toastr.warning(`Сохранено ${savedCount} из ${slots.length} слотов. Ошибки: ${errors.join(', ')}`);
+                } else {
+                    toastr.success(`Сохранено ${savedCount} слотов`);
+                }
+            }
+        } else {
+            if (settings.showNotifications) {
+                toastr.error(`Не удалось сохранить кеш. Ошибки: ${errors.join(', ')}`);
+            }
+        }
+    }
+
     // Автоматическое сохранение кеша
     async function autoSaveCache() {
         if (!settings.enabled) {
@@ -709,6 +788,88 @@
         }
         
         updateUI();
+    }
+
+    // Принудительное сохранение кеша (без проверки счетчика сообщений)
+    async function forceAutoSave() {
+        if (!settings.enabled) {
+            if (settings.showNotifications) {
+                toastr.warning('Автосохранение отключено');
+            }
+            return;
+        }
+
+        const chatId = getCurrentChatId();
+        console.log(`[KV Cache Manager] Принудительное сохранение кеша для чата ${chatId}`);
+
+        // Проверка доступности сервера
+        const isServerAvailable = await checkServerAvailability();
+        if (!isServerAvailable) {
+            console.warn('[KV Cache Manager] Сервер llama.cpp недоступен');
+            if (settings.showNotifications) {
+                toastr.error('Сервер llama.cpp недоступен');
+            }
+            return;
+        }
+
+        const slots = await getActiveSlots();
+        if (slots.length === 0) {
+            console.log('[KV Cache Manager] Нет активных слотов для сохранения');
+            if (settings.showNotifications) {
+                toastr.warning('Нет активных слотов для сохранения');
+            }
+            return;
+        }
+
+        let savedCount = 0;
+        let errors = [];
+
+        for (const slotId of slots) {
+            try {
+                const filename = generateAutoSaveFilename(slotId);
+                if (await saveSlotCache(slotId, filename)) {
+                    savedCount++;
+                } else {
+                    errors.push(`Слот ${slotId}`);
+                }
+            } catch (e) {
+                console.error(`[KV Cache Manager] Ошибка при сохранении слота ${slotId}:`, e);
+                errors.push(`Слот ${slotId}: ${e.message}`);
+            }
+        }
+
+        if (savedCount > 0) {
+            // Сброс счетчика при принудительном сохранении
+            messageCounters[chatId] = 0;
+
+            // Ротация файлов
+            try {
+                await rotateAutoSaveFiles();
+            } catch (e) {
+                console.error('[KV Cache Manager] Ошибка при ротации файлов:', e);
+            }
+
+            // Обновление статистики
+            try {
+                await updateStatistics();
+            } catch (e) {
+                console.error('[KV Cache Manager] Ошибка при обновлении статистики:', e);
+            }
+
+            updateUI();
+
+            if (settings.showNotifications) {
+                if (errors.length > 0) {
+                    toastr.warning(`Сохранено ${savedCount} из ${slots.length} слотов. Ошибки: ${errors.join(', ')}`);
+                } else {
+                    toastr.success(`Сохранено ${savedCount} слотов`);
+                }
+            }
+        } else {
+            if (settings.showNotifications) {
+                toastr.error(`Не удалось сохранить кеш. Ошибки: ${errors.join(', ')}`);
+            }
+        }
     }
 
     // Ручное сохранение с именем
@@ -1022,6 +1183,9 @@
                 </div>
                 <div class="kv-cache-manager-field">
                     <span id="kv-cache-next-save">Следующее сохранение через: - сообщений</span>
+                </div>
+                <div class="kv-cache-manager-field flex-container">
+                    <input id="kv-cache-save-now-button" class="menu_button" type="submit" value="Сохранить сейчас" />
                 </div>
             </div>
 

@@ -1,6 +1,10 @@
 # KV Cache Manager для SillyTavern
 
-Расширение для управления KV-кешем llama.cpp в SillyTavern.
+Расширение для управления KV-кешем llama.cpp сервера с автоматическим сохранением и загрузкой кеша.
+
+## Зависимости
+
+Это расширение использует интеграцию с [llamacpp-slot-manager](https://github.com/sasha0552/llamacpp-slot-manager) для определения активных слотов и работы с персонажами. Убедитесь, что расширение `llamacpp-slot-manager` установлено и активно.
 
 ## Функциональность
 
@@ -51,14 +55,16 @@
 
 ## Формат файлов
 
-- **Автосохранения**: `{chat_name}_slot{slot_id}_{timestamp}.bin`
-- **Ручные сохранения**: `{user_name}_{chat_name}_slot{slot_id}_{timestamp}.bin`
+- **Автосохранения**: `{chat_name}_{character_name}_{timestamp}.bin`
+- **Ручные сохранения**: `{user_name}_{chat_name}_{character_name}_{timestamp}.bin`
+
+> **Примечание**: Имена файлов содержат имена персонажей вместо номеров слотов для обеспечения корректной загрузки даже при изменении порядка слотов.
 
 ## Требования
 
 - SillyTavern с поддержкой расширений
 - llama.cpp сервер с поддержкой KV-кеша
-- Расширение llama.cpp-slot-manager (для групповых чатов)
+- [llamacpp-slot-manager](https://github.com/sasha0552/llamacpp-slot-manager) - **обязательно** (для определения активных слотов и работы с персонажами)
 
 ## Лицензия
 

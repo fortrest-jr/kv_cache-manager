@@ -502,47 +502,67 @@ function parseCacheFilename(filename) {
     return { isValid: false };
 }
 
-// Получение списка сохраненных файлов кеша из папки
+// Получение списка сохраненных файлов кеша из папки через Node.js fs API
 // Путь используется только для поиска файлов в расширении, 
 // так как в llama.cpp путь к папке кеша фиксирован при запуске
 async function getCacheFilesList() {
     const settings = extension_settings[extensionName] || defaultSettings;
     const cachePath = settings.cachePath || defaultSettings.cachePath;
     
-    // Заменяем ~ на домашнюю директорию пользователя
-    const normalizedPath = cachePath.replace(/^~/, () => {
-        // В браузере ~ не работает, но можно использовать относительный путь
-        // Или использовать API SillyTavern для работы с файлами
-        return '';
-    });
+    console.log(`[KV Cache Manager] Получение списка файлов из: ${cachePath}`);
     
     try {
-        // Используем API SillyTavern для получения списка файлов
-        // Обычно это /api/files/list или /api/files с параметром path
-        const apiUrl = typeof main_api !== 'undefined' ? main_api : '/api';
-        const response = await fetch(`${apiUrl}/files/list`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ path: normalizedPath })
-        });
+        // Используем Node.js API для чтения файловой системы
+        let fs, path, os;
         
-        if (response.ok) {
-            const data = await response.json();
-            // Фильтруем только .bin файлы
-            if (Array.isArray(data)) {
-                return data.filter(file => file.endsWith('.bin'));
-            } else if (data.files && Array.isArray(data.files)) {
-                return data.files.filter(file => file.endsWith('.bin'));
-            }
-            return [];
+        // Пробуем разные способы доступа к Node.js модулям
+        if (typeof require !== 'undefined') {
+            fs = require('fs');
+            path = require('path');
+            os = require('os');
+        } else if (typeof window !== 'undefined' && window.require) {
+            fs = window.require('fs');
+            path = window.require('path');
+            os = window.require('os');
         } else {
-            console.debug('[KV Cache Manager] Ошибка получения списка файлов:', response.status);
+            console.warn('[KV Cache Manager] Нет доступа к Node.js модулям');
             return [];
         }
+        
+        // Заменяем ~ на домашнюю директорию
+        const normalizedPath = cachePath.replace(/^~/, os.homedir());
+        const fullPath = path.resolve(normalizedPath);
+        
+        console.log(`[KV Cache Manager] Читаю директорию: ${fullPath}`);
+        
+        // Проверяем, существует ли директория
+        if (!fs.existsSync(fullPath)) {
+            console.warn(`[KV Cache Manager] Директория не существует: ${fullPath}`);
+            return [];
+        }
+        
+        // Проверяем, что это директория
+        const stats = fs.statSync(fullPath);
+        if (!stats.isDirectory()) {
+            console.warn(`[KV Cache Manager] Путь не является директорией: ${fullPath}`);
+            return [];
+        }
+        
+        // Читаем все файлы из директории
+        const files = fs.readdirSync(fullPath);
+        
+        // Фильтруем только .bin файлы
+        const binFiles = files.filter(file => {
+            const filePath = path.join(fullPath, file);
+            const fileStats = fs.statSync(filePath);
+            return fileStats.isFile() && file.endsWith('.bin');
+        });
+        
+        console.log(`[KV Cache Manager] Найдено ${binFiles.length} .bin файлов:`, binFiles);
+        return binFiles;
+        
     } catch (e) {
-        console.debug('[KV Cache Manager] Ошибка получения списка файлов:', e);
+        console.error('[KV Cache Manager] Ошибка получения списка файлов:', e);
         return [];
     }
 }
@@ -843,14 +863,8 @@ jQuery(async () => {
     
     // Обновляем список слотов при старте
     updateSlotsList();
-    
-    // Обновляем список слотов периодически (каждые 5 секунд)
-    setInterval(() => {
-        updateSlotsList();
-    }, 5000);
-    
-    // Обновляем список слотов при клике на кнопки сохранения
-    $("#kv-cache-save-button, #kv-cache-save-now-button").on("click", () => {
+    // Обновляем список слотов только при сохранении/загрузке
+    $("#kv-cache-save-button, #kv-cache-save-now-button, #kv-cache-load-button").on("click", () => {
         setTimeout(() => updateSlotsList(), 1000);
     });
 });

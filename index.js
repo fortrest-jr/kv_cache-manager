@@ -4,7 +4,7 @@
 
 // Импортируем необходимые функции
 import { extension_settings, getContext, loadExtensionSettings } from "../../../extensions.js";
-import { saveSettingsDebounced } from "../../../../script.js";
+import { saveSettingsDebounced, eventSource, event_types } from "../../../../script.js";
 
 // Имя расширения должно совпадать с именем папки
 const extensionName = "SillyTavern-llamacpp-kv_cache-manager";
@@ -592,37 +592,33 @@ async function onSaveButtonClick() {
         }
     }
     
-    if (characterNames.length === 0) {
-        showToast('warning', 'Нет персонажей для сохранения');
-        return;
-    }
-    
-    // Распределяем персонажей по слотам перед сохранением
-    const slotsToSave = [];
-    for (const characterName of characterNames) {
-        const slotId = acquireSlot(characterName);
-        if (slotId !== null) {
-            slotsToSave.push({ slotId, characterName });
-        }
-    }
-    
-    if (slotsToSave.length === 0) {
-        showToast('warning', 'Не удалось распределить персонажей по слотам');
-        return;
-    }
-    
-    // Проверяем валидность слотов
-    const slots = [];
-    for (const { slotId, characterName } of slotsToSave) {
+    // Проверяем все слоты на валидность и используем уже распределенные слоты
+    const validSlots = [];
+    for (let slotId = 0; slotId < slotManagement.slots.length; slotId++) {
         if (await isSlotValid(slotId)) {
-            slots.push({ slotId, characterName });
+            // Используем имя персонажа из распределения слотов
+            let characterName = slotManagement.slots[slotId];
+            
+            // Если слот не распределен, используем первого персонажа из чата как fallback
+            if (!characterName && characterNames.length > 0) {
+                characterName = characterNames[0];
+            }
+            
+            // Если все еще нет имени, используем общее
+            if (!characterName) {
+                characterName = getCurrentCharacterName() || 'character';
+            }
+            
+            validSlots.push({ slotId, characterName });
         }
     }
     
-    if (slots.length === 0) {
+    if (validSlots.length === 0) {
         showToast('warning', 'Нет активных слотов с валидным кешем для сохранения');
         return;
     }
+    
+    const slots = validSlots;
     
     showToast('info', `Найдено ${slots.length} активных слотов`);
     
@@ -700,37 +696,33 @@ async function onSaveNowButtonClick() {
         }
     }
     
-    if (characterNames.length === 0) {
-        showToast('warning', 'Нет персонажей для сохранения');
-        return;
-    }
-    
-    // Распределяем персонажей по слотам перед сохранением
-    const slotsToSave = [];
-    for (const characterName of characterNames) {
-        const slotId = acquireSlot(characterName);
-        if (slotId !== null) {
-            slotsToSave.push({ slotId, characterName });
-        }
-    }
-    
-    if (slotsToSave.length === 0) {
-        showToast('warning', 'Не удалось распределить персонажей по слотам');
-        return;
-    }
-    
-    // Проверяем валидность слотов
-    const slots = [];
-    for (const { slotId, characterName } of slotsToSave) {
+    // Проверяем все слоты на валидность и используем уже распределенные слоты
+    const validSlots = [];
+    for (let slotId = 0; slotId < slotManagement.slots.length; slotId++) {
         if (await isSlotValid(slotId)) {
-            slots.push({ slotId, characterName });
+            // Используем имя персонажа из распределения слотов
+            let characterName = slotManagement.slots[slotId];
+            
+            // Если слот не распределен, используем первого персонажа из чата как fallback
+            if (!characterName && characterNames.length > 0) {
+                characterName = characterNames[0];
+            }
+            
+            // Если все еще нет имени, используем общее
+            if (!characterName) {
+                characterName = getCurrentCharacterName() || 'character';
+            }
+            
+            validSlots.push({ slotId, characterName });
         }
     }
     
-    if (slots.length === 0) {
+    if (validSlots.length === 0) {
         showToast('warning', 'Нет активных слотов с валидным кешем для сохранения');
         return;
     }
+    
+    const slots = validSlots;
     
     showToast('info', `Найдено ${slots.length} активных слотов`);
     
@@ -765,6 +757,9 @@ async function onSaveNowButtonClick() {
     }
 }
 
+// Обработчик события генерации - распределяем слоты при начале генерации
+let currentSlot = null;
+
 // Функция вызывается при загрузке расширения
 jQuery(async () => {
     // Загружаем HTML из файла
@@ -789,6 +784,29 @@ jQuery(async () => {
     // Загружаем настройки при старте
     loadSettings();
     
+    // Инициализируем слоты при старте приложения
+    eventSource.on(event_types.APP_READY, async () => {
+        if (!slotManagement.slots || slotManagement.slots.length === 0) {
+            const slotsCount = await detectSlotsCount();
+            initializeSlots(slotsCount);
+        }
+    });
+    
+    // Распределяем слоты при начале генерации (как в slot-manager)
+    eventSource.on(event_types.GENERATE_BEFORE_COMBINE_PROMPTS, (data) => {
+        if (data && data.char) {
+            // Инициализируем слоты, если нужно
+            if (!slotManagement.slots || slotManagement.slots.length === 0) {
+                // Используем дефолтное значение, если не удалось определить
+                initializeSlots(2);
+            }
+            
+            // Распределяем слот для персонажа
+            currentSlot = acquireSlot(data.char);
+            console.debug(`[KV Cache Manager] Распределен слот ${currentSlot} для персонажа ${data.char}`);
+        }
+    });
+    
     // Обновляем список слотов при старте
     updateSlotsList();
     
@@ -797,9 +815,7 @@ jQuery(async () => {
         updateSlotsList();
     }, 5000);
     
-    // Обновляем список слотов при изменении настроек slot-manager
-    // Слушаем изменения в extension_settings через события или периодически
-    // Также обновляем при клике на кнопки сохранения
+    // Обновляем список слотов при клике на кнопки сохранения
     $("#kv-cache-save-button, #kv-cache-save-now-button").on("click", () => {
         setTimeout(() => updateSlotsList(), 1000);
     });

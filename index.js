@@ -166,7 +166,7 @@ async function detectSlotsCount() {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000);
         
-        const response = await fetch(`${llamaUrl}/slots`, {
+        const response = await fetch(`${llamaUrl}slots`, {
             method: 'GET',
             signal: controller.signal
         });
@@ -196,7 +196,7 @@ async function detectSlotsCount() {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 2000);
             
-            const response = await fetch(`${llamaUrl}/slots/${i}`, {
+            const response = await fetch(`${llamaUrl}slots/${i}`, {
                 method: 'GET',
                 signal: controller.signal
             });
@@ -262,7 +262,7 @@ async function getAllSlotsInfo() {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 секунд таймаут
         
-        const response = await fetch(`${llamaUrl}/slots`, {
+        const response = await fetch(`${llamaUrl}slots`, {
             method: 'GET',
             signal: controller.signal
         });
@@ -371,7 +371,7 @@ async function updateSlotsList() {
 // Сохранение кеша для слота
 async function saveSlotCache(slotId, filename) {
     const llamaUrl = getLlamaUrl();
-    const url = `${llamaUrl}/slots/${slotId}?action=save`;
+    const url = `${llamaUrl}slots/${slotId}?action=save`;
     const requestBody = { filename: filename };
     
     console.log(`[KV Cache Manager] Сохранение кеша: URL=${url}, filename=${filename}`);
@@ -420,7 +420,7 @@ async function loadSlotCache(slotId, filename) {
         
         console.log(`[KV Cache Manager] Загрузка кеша: слот ${slotId}, файл ${filename}`);
         
-        const response = await fetch(`${llamaUrl}/slots/${slotId}?action=restore`, {
+        const response = await fetch(`${llamaUrl}slots/${slotId}?action=restore`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -556,7 +556,7 @@ async function checkServerAvailability() {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 секунд таймаут
         
-        const response = await fetch(`${llamaUrl}/health`, {
+        const response = await fetch(`${llamaUrl}health`, {
             method: 'GET',
             signal: controller.signal
         });

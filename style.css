@@ -97,6 +97,11 @@
     border-radius: 8px;
 }
 
+#kv-cache-auto-load-confirm-modal .dialogue_popup_header {
+    background: transparent;
+    border-bottom: 1px solid var(--SmartThemeBorderColor);
+}
+
 #kv-cache-auto-load-confirm-modal .dialogue_popup_body {
     padding: 20px;
     min-height: 100px;

@@ -1,6 +1,5 @@
 // KV Cache Manager для SillyTavern
 // Расширение для управления KV-кешем llama.cpp
-// Этап 2: Обычное сохранение и загрузка кеша по кнопке
 
 // Импортируем необходимые функции
 import { extension_settings, getContext, loadExtensionSettings } from "../../../extensions.js";
@@ -17,8 +16,7 @@ const defaultSettings = {
     autoLoadOnChatSwitch: true,
     maxFiles: 10,
     showNotifications: true,
-    checkSlotUsage: true,
-    saves: [] // Список сохранений: [{ timestamp, chatName, userName, files: [{ filename, slotId }] }]
+    checkSlotUsage: true
 };
 
 const extensionSettings = extension_settings[extensionName] ||= {};
@@ -397,66 +395,53 @@ async function loadSlotCache(slotId, filename) {
     }
 }
 
-// Получение списка сохранений из настроек
-function getSavesList() {
-    return extensionSettings.saves || [];
+// Получение списка файлов через API плагина kv_cache-manager-plugin
+// Все файлы считываются напрямую из папки сохранений, метаданные не используются
+async function getFilesList() {
+    const llamaUrl = getLlamaUrl();
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 секунд таймаут
+        
+        // Обращаемся к API плагина для получения списка файлов
+        const response = await fetch(`/api/plugins/kv-cache-manager/files`, {
+            method: 'GET',
+            signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+            const data = await response.json();
+            // Фильтруем только .bin файлы и не директории
+            const binFiles = (data.files || []).filter(file => 
+                file.name.endsWith('.bin') && !file.isDirectory
+            );
+            return binFiles.map(file => file.name);
+        } else {
+            console.error('[KV Cache Manager] Ошибка получения списка файлов:', response.status);
+            showToast('error', 'Ошибка получения списка файлов с сервера');
+            return [];
+        }
+    } catch (e) {
+        if (e.name !== 'AbortError') {
+            console.error('[KV Cache Manager] Ошибка получения списка файлов:', e);
+            showToast('error', 'Ошибка получения списка файлов: ' + e.message);
+        }
+        return [];
+    }
 }
 
-// Добавление сохранения в список
-// Храним только список имён файлов, всё остальное извлекается из имён файлов
-function addSaveToList(timestamp, chatName, userName, files) {
-    if (!extensionSettings.saves) {
-        extensionSettings.saves = [];
-    }
-    
-    // Добавляем сохранение в начало списка
-    // timestamp, userName, chatId и slotId теперь извлекаются из имён файлов при загрузке
-    extensionSettings.saves.unshift({
-        files: files.map(f => f.filename) // Храним только имена файлов
-    });
-    
-    // Ограничиваем количество сохранений (храним последние N)
-    const maxSaves = 100; // Максимум сохранений в списке
-    if (extensionSettings.saves.length > maxSaves) {
-        extensionSettings.saves = extensionSettings.saves.slice(0, maxSaves);
-    }
-    
-    saveSettingsDebounced();
-}
-
-// Удаление сохранения из списка
-function removeSaveFromList(timestamp, chatName) {
-    if (!extensionSettings.saves) {
-        return;
-    }
-    
-    extensionSettings.saves = extensionSettings.saves.filter(save => 
-        !(save.timestamp === timestamp && save.chatName === chatName)
-    );
-    
-    saveSettingsDebounced();
-}
-
-// Группировка сохранений по chatId и timestamp (из имён файлов)
-function groupSavesByChatAndTimestamp(saves) {
+// Группировка файлов по chatId и timestamp (из имён файлов)
+function groupFilesByChatAndTimestamp(filenames) {
     const groups = {};
     
-    for (const save of saves) {
-        // Парсим первый файл для получения chatId и timestamp
-        if (!save.files || save.files.length === 0) {
-            continue;
-        }
-        
-        // files теперь массив строк (имён файлов)
-        const firstFilename = typeof save.files[0] === 'string' 
-            ? save.files[0] 
-            : save.files[0].filename; // Поддержка старого формата
-        
-        const parsed = parseSaveFilename(firstFilename);
+    for (const filename of filenames) {
+        const parsed = parseSaveFilename(filename);
         
         if (!parsed) {
-            // Если не удалось распарсить, пропускаем это сохранение
-            console.warn('[KV Cache Manager] Не удалось распарсить имя файла:', firstFilename);
+            // Если не удалось распарсить, пропускаем этот файл
+            console.warn('[KV Cache Manager] Не удалось распарсить имя файла:', filename);
             continue;
         }
         
@@ -470,9 +455,7 @@ function groupSavesByChatAndTimestamp(saves) {
                 files: []
             };
         }
-        // Преобразуем в массив строк, если нужно
-        const fileList = save.files.map(f => typeof f === 'string' ? f : f.filename);
-        groups[key].files.push(...fileList);
+        groups[key].files.push(filename);
     }
     
     return groups;
@@ -516,7 +499,6 @@ async function saveCache(requestUserName = false) {
     
     let savedCount = 0;
     let errors = [];
-    const savedFiles = [];
     
     for (const slotId of slots) {
         try {
@@ -524,7 +506,6 @@ async function saveCache(requestUserName = false) {
             console.debug(`[KV Cache Manager] Сохранение слота ${slotId} с именем файла: ${filename}`);
             if (await saveSlotCache(slotId, filename)) {
                 savedCount++;
-                savedFiles.push({ filename: filename }); // Храним только имя файла
                 console.debug(`[KV Cache Manager] Сохранен кеш для слота ${slotId}: ${filename}`);
             } else {
                 errors.push(`слот ${slotId}`);
@@ -536,9 +517,6 @@ async function saveCache(requestUserName = false) {
     }
     
     if (savedCount > 0) {
-        // Добавляем сохранение в список
-        addSaveToList(timestamp, null, userName, savedFiles);
-        
         // Формируем сообщение об успехе
         if (errors.length > 0) {
             showToast('warning', `Сохранено ${savedCount} из ${slots.length} слотов. Ошибки: ${errors.join(', ')}`);
@@ -564,16 +542,16 @@ async function onSaveNowButtonClick() {
 async function onLoadButtonClick() {
     showToast('info', 'Начинаю загрузку кеша...');
     
-    // Получаем список сохранений из настроек
-    const savesList = getSavesList();
+    // Получаем список файлов через API плагина
+    const filesList = await getFilesList();
     
-    if (!savesList || savesList.length === 0) {
+    if (!filesList || filesList.length === 0) {
         showToast('warning', 'Не найдено сохранений для загрузки. Сначала сохраните кеш.');
         return;
     }
     
-    // Группируем сохранения по имени чата и timestamp
-    const groups = groupSavesByChatAndTimestamp(savesList);
+    // Группируем файлы по имени чата и timestamp
+    const groups = groupFilesByChatAndTimestamp(filesList);
     const groupKeys = Object.keys(groups).sort().reverse(); // Сортируем по убыванию (новые первыми)
     
     if (groupKeys.length === 0) {
@@ -703,6 +681,14 @@ jQuery(async () => {
     // Загружаем настройки при старте
     loadSettings();
     updateSlotsList();
+    
+    // Считываем все файлы при загрузке через API плагина (для проверки доступности)
+    try {
+        const filesList = await getFilesList();
+        console.debug(`[KV Cache Manager] При загрузке найдено ${filesList.length} файлов сохранений`);
+    } catch (e) {
+        console.debug('[KV Cache Manager] Не удалось получить список файлов при загрузке (возможно, API плагина недоступен):', e);
+    }
     
     // Обновляем список слотов при запуске генерации
     eventSource.on(event_types.GENERATE_BEFORE_COMBINE_PROMPTS, () => {

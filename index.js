@@ -116,7 +116,9 @@ function onValidateChange(event) {
 
 // Получение URL llama.cpp сервера
 function getLlamaUrl() {
-    return textgenerationwebui_settings.server_urls[textgen_types.LLAMACPP];
+    const provided_url = textgenerationwebui_settings.server_urls[textgen_types.LLAMACPP]
+    showToast('warning', 'provided_url: ' + provided_url);
+    return provided_url;
 }
 
 // Получение имени текущего чата

@@ -21,11 +21,17 @@ const defaultSettings = {
     saves: [] // Список сохранений: [{ timestamp, chatName, userName, files: [{ filename, slotId }] }]
 };
 
-const extensionSettings = extension_settings[extensionName] || defaultSettings;
+const extensionSettings = extension_settings[extensionName] ||= {};
 
 
 // Загрузка настроек
 async function loadSettings() {
+    // Убеждаемся, что все поля из defaultSettings инициализированы
+    for (const key in defaultSettings) {
+        if (!(key in extensionSettings)) {
+            extensionSettings[key] = defaultSettings[key];
+        }
+    }
     $("#kv-cache-enabled").prop("checked", extensionSettings.enabled).trigger("input");
     $("#kv-cache-save-interval").val(extensionSettings.saveInterval).trigger("input");
     $("#kv-cache-max-files").val(extensionSettings.maxFiles).trigger("input");
@@ -376,8 +382,8 @@ function addSaveToList(timestamp, chatName, userName, files) {
     
     // Ограничиваем количество сохранений (храним последние N)
     const maxSaves = 100; // Максимум сохранений в списке
-    if (settings.saves.length > maxSaves) {
-        settings.saves = settings.saves.slice(0, maxSaves);
+    if (extensionSettings.saves.length > maxSaves) {
+        extensionSettings.saves = extensionSettings.saves.slice(0, maxSaves);
     }
     
     saveSettingsDebounced();

@@ -1304,17 +1304,13 @@ jQuery(async () => {
     });
     
     // Подписка на событие переключения чата для автозагрузки
-    let lastChatId = getNormalizedChatId();
     eventSource.on(event_types.CHAT_CHANGED, async () => {
         const currentChatId = getNormalizedChatId();
         // Проверяем, что чат действительно изменился
-        if (currentChatId !== lastChatId) {
-            lastChatId = currentChatId;
-            // Небольшая задержка, чтобы чат успел полностью загрузиться
-            setTimeout(async () => {
-                await tryAutoLoadOnChatSwitch(currentChatId);
-            }, 500);
-        }
+        // Небольшая задержка, чтобы чат успел полностью загрузиться
+        setTimeout(async () => {
+            await tryAutoLoadOnChatSwitch(currentChatId);
+        }, 500);
     });
     
     // При переключении чата счетчик не сбрасывается - каждый чат имеет свой независимый счетчик

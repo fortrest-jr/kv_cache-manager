@@ -116,21 +116,6 @@ function getLlamaUrl() {
     return provided_url;
 }
 
-// Получение имени текущего чата
-function getCurrentChatName() {
-    const context = getContext();
-    if (context.chat && context.chat.name) {
-        return context.chat.name;
-    }
-    if (context.chat && context.chat.title) {
-        return context.chat.title;
-    }
-    // Если имя чата не найдено, используем ID чата
-    if (context.chat && context.chat.id) {
-        return `chat_${context.chat.id}`;
-    }
-    return 'chat';
-}
 
 // Получение количества слотов из ответа /slots
 function getSlotsCountFromData(slotsData) {
@@ -656,13 +641,10 @@ function renderLoadModalChats() {
     const currentChatId = loadModalData.currentChatId;
     const chats = loadModalData.chats;
     
-    // Получаем имя текущего чата
-    const currentChatName = getCurrentChatName();
-    
-    // Обновляем имя и счетчик для текущего чата
+    // Обновляем ID и счетчик для текущего чата
     const currentChatGroups = chats[currentChatId] || [];
     const currentCount = currentChatGroups.reduce((sum, g) => sum + g.files.length, 0);
-    $(".kv-cache-load-chat-item-current .kv-cache-load-chat-name-text").text(currentChatName);
+    $(".kv-cache-load-chat-item-current .kv-cache-load-chat-name-text").text(currentChatId || 'unknown');
     $(".kv-cache-load-chat-item-current .kv-cache-load-chat-count").text(currentCount > 0 ? currentCount : '-');
     
     // Фильтруем чаты по поисковому запросу

@@ -47,16 +47,16 @@
             <div class="kv-cache-manager-section">
                 <h3>Автоматическое сохранение</h3>
                 <div class="kv-cache-manager-field flex-container">
-                    <input type="checkbox" id="kv-cache-enabled" disabled />
+                    <input type="checkbox" id="kv-cache-enabled" />
                     <label for="kv-cache-enabled">Включить автосохранение</label>
                 </div>
                 <div class="kv-cache-manager-field flex-container">
                     <label for="kv-cache-save-interval">Сохранять каждые N сообщений:</label>
-                    <input type="number" id="kv-cache-save-interval" class="text_pole" min="1" value="5" disabled />
+                    <input type="number" id="kv-cache-save-interval" class="text_pole" min="1" value="5" />
                 </div>
                 <div class="kv-cache-manager-field flex-container">
                     <label for="kv-cache-max-files">Максимум файлов на сессию:</label>
-                    <input type="number" id="kv-cache-max-files" class="text_pole" min="1" value="10" disabled />
+                    <input type="number" id="kv-cache-max-files" class="text_pole" min="1" value="10" />
                 </div>
                 <div class="kv-cache-manager-field">
                     <span id="kv-cache-next-save">Следующее сохранение через: - сообщений</span>
@@ -111,8 +111,8 @@
                     Файл не выбран
                 </div>
                 <div>
-                    <button id="kv-cache-load-cancel-button" class="menu_button">Отмена</button>
                     <button id="kv-cache-load-confirm-button" class="menu_button" disabled>Загрузить</button>
+                    <button id="kv-cache-load-cancel-button" class="menu_button">Отмена</button>
                 </div>
             </div>
         </div>

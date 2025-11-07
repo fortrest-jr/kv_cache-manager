@@ -27,12 +27,19 @@ const messageCounters = {};
 // Обновление индикатора следующего сохранения
 function updateNextSaveIndicator() {
     const indicator = $("#kv-cache-next-save");
-    if (indicator.length === 0) {
+    const headerTitle = $(".kv-cache-manager-settings .inline-drawer-toggle.inline-drawer-header b");
+    
+    if (indicator.length === 0 && headerTitle.length === 0) {
         return;
     }
     
     if (!extensionSettings.enabled) {
-        indicator.text("Автосохранение отключено");
+        if (indicator.length > 0) {
+            indicator.text("Автосохранение отключено");
+        }
+        if (headerTitle.length > 0) {
+            headerTitle.text("KV Cache Manager");
+        }
         return;
     }
     
@@ -41,11 +48,19 @@ function updateNextSaveIndicator() {
     const interval = extensionSettings.saveInterval;
     const remaining = Math.max(0, interval - currentCount);
     
-    if (remaining === 0) {
-        indicator.text("Следующее сохранение при следующем сообщении");
-    } else {
-        const messageWord = remaining === 1 ? 'сообщение' : remaining < 5 ? 'сообщения' : 'сообщений';
-        indicator.text(`Следующее сохранение через: ${remaining} ${messageWord}`);
+    // Обновляем индикатор в настройках
+    if (indicator.length > 0) {
+        if (remaining === 0) {
+            indicator.text("Следующее сохранение при следующем сообщении");
+        } else {
+            const messageWord = remaining === 1 ? 'сообщение' : remaining < 5 ? 'сообщения' : 'сообщений';
+            indicator.text(`Следующее сохранение через: ${remaining} ${messageWord}`);
+        }
+    }
+    
+    // Обновляем заголовок расширения с числом в квадратных скобках
+    if (headerTitle.length > 0) {
+        headerTitle.text(`[${remaining}] KV Cache Manager`);
     }
 }
 

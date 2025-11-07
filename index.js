@@ -4,7 +4,7 @@
 
 // Импортируем необходимые функции
 import { extension_settings, getContext, loadExtensionSettings } from "../../../extensions.js";
-import { saveSettingsDebounced } from "../../../../script.js";
+import { saveSettingsDebounced, eventSource, event_types } from "../../../../script.js";
 import { textgen_types, textgenerationwebui_settings } from '../../../textgen-settings.js';
 
 // Имя расширения должно совпадать с именем папки
@@ -265,7 +265,6 @@ async function updateSlotsList() {
         }
         html += '</ul>';
         html += `<p style="margin-top: 5px; font-size: 0.9em; color: var(--SmartThemeBodyColor, inherit);">Всего: ${validSlots.length} слот(ов) из ${totalSlots}</p>`;
-        html += `<p style="margin-top: 3px; font-size: 0.85em; color: var(--SmartThemeBodyColor, inherit); opacity: 0.7;">Будут сохранены все валидные слоты</p>`;
         
         slotsListElement.html(html);
     } catch (e) {
@@ -644,6 +643,15 @@ jQuery(async () => {
     // Добавляем HTML в контейнер настроек
     $("#extensions_settings").append(settingsHtml);
 
+    // Загружаем настройки при старте
+    loadSettings();
+    updateSlotsList();
+    
+    // Обновляем список слотов при запуске генерации
+    eventSource.on(event_types.GENERATE_BEFORE_COMBINE_PROMPTS, () => {
+        updateSlotsList();
+    });
+
     // Настраиваем обработчики событий
     $("#kv-cache-enabled").on("input", onEnabledChange);
     $("#kv-cache-save-interval").on("input", onSaveIntervalChange);
@@ -655,14 +663,6 @@ jQuery(async () => {
     $("#kv-cache-save-button").on("click", onSaveButtonClick);
     $("#kv-cache-load-button").on("click", onLoadButtonClick);
     $("#kv-cache-save-now-button").on("click", onSaveNowButtonClick);
-
-    // Загружаем настройки при старте
-    loadSettings();
-    
-    // Инициализация больше не нужна - количество слотов определяется из ответа API
-    
-    // Показываем placeholder для списка слотов (обновится при сохранении/загрузке)
-    updateSlotsList();
     
     // Обновляем список слотов при сохранении
     $("#kv-cache-save-button, #kv-cache-save-now-button").on("click", () => {

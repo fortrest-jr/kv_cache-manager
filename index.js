@@ -1092,29 +1092,10 @@ jQuery(async () => {
         updateSlotsList();
     });
     
-    // Подписка на события для автосохранения
-    // Пробуем подписаться на различные события, которые могут сигнализировать о новом сообщении
-    const messageEvents = [
-        event_types.MESSAGE_SENT,
-        event_types.MESSAGE_RECEIVED,
-        event_types.MESSAGE_ADDED
-    ].filter(Boolean); // Убираем undefined значения
-    
-    let messageEventSubscribed = false;
-    for (const eventType of messageEvents) {
-        try {
-            if (eventSource && typeof eventSource.on === 'function') {
-                eventSource.on(eventType, () => {
-                    incrementMessageCounter();
-                });
-                console.debug(`[KV Cache Manager] Подписан на событие: ${eventType}`);
-                messageEventSubscribed = true;
-            }
-        } catch (e) {
-            // Событие не существует, пробуем следующее
-            console.debug(`[KV Cache Manager] Событие ${eventType} недоступно:`, e);
-        }
-    }
+    // Подписка на событие отправки сообщения для автосохранения
+    eventSource.on(event_types.MESSAGE_SENT, () => {
+        incrementMessageCounter();
+    });
     
     // При переключении чата счетчик не сбрасывается - каждый чат имеет свой независимый счетчик
     // Счетчик автоматически создается при первом сообщении в новом чате

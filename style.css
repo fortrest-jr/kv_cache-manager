@@ -76,7 +76,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: var(--SmartThemeBlurTintColor, #1a1a1a);
+    background: rgba(0, 0, 0, 0.85);
     backdrop-filter: blur(4px);
     display: flex;
     align-items: center;
@@ -93,6 +93,9 @@
 #kv-cache-auto-load-confirm-modal .dialogue_popup_content {
     width: 500px;
     max-width: 95vw;
+    background: var(--SmartThemeBlurTintColor, #1a1a1a);
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 }
 
 #kv-cache-auto-load-confirm-modal .dialogue_popup_body {

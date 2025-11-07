@@ -8,7 +8,7 @@ import { saveSettingsDebounced } from "../../../../script.js";
 import { textgen_types, textgenerationwebui_settings } from '../../../textgen-settings.js';
 
 // Имя расширения должно совпадать с именем папки
-const extensionName = "SillyTavern-llamacpp-kv_cache-manager";
+const extensionName = "kv_cache-manager";
 const extensionFolderPath = `scripts/extensions/third-party/${extensionName}`;
 
 const defaultSettings = {

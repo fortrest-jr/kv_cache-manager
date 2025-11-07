@@ -1273,6 +1273,33 @@ jQuery(async () => {
 
     // Добавляем HTML в контейнер настроек
     $("#extensions_settings").append(settingsHtml);
+    
+    // Создаем модалку подтверждения автозагрузки и добавляем её напрямую в body
+    const autoLoadConfirmModal = $(`
+        <div id="kv-cache-auto-load-confirm-modal" class="dialogue_popup" style="display: none;">
+            <div class="dialogue_popup_content">
+                <div class="dialogue_popup_header">
+                    <h3>Автозагрузка кеша</h3>
+                    <button class="dialogue_popup_close" id="kv-cache-auto-load-confirm-modal-close">
+                        <i class="fa-solid fa-times"></i>
+                    </button>
+                </div>
+                <div class="dialogue_popup_body">
+                    <div id="kv-cache-auto-load-confirm-info" style="padding: 20px; color: var(--SmartThemeBodyColor);">
+                        Загрузка информации...
+                    </div>
+                </div>
+                <div class="dialogue_popup_footer">
+                    <div></div>
+                    <div>
+                        <button id="kv-cache-auto-load-confirm-ok" class="menu_button">Загрузить</button>
+                        <button id="kv-cache-auto-load-confirm-cancel" class="menu_button">Отмена</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `);
+    $("body").append(autoLoadConfirmModal);
 
     // Загружаем настройки при старте
     loadSettings();

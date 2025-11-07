@@ -18,7 +18,7 @@ const defaultSettings = {
     autoLoadOnChatSwitch: true,
     maxFiles: 10,
     showNotifications: true,
-    validateCache: true,
+    checkSlotUsage: true,
     saves: [] // Список сохранений: [{ timestamp, chatName, userName, files: [{ filename, slotId }] }]
 };
 
@@ -38,14 +38,14 @@ async function loadSettings() {
     $("#kv-cache-max-files").val(settings.maxFiles).trigger("input");
     $("#kv-cache-auto-load").prop("checked", settings.autoLoadOnChatSwitch).trigger("input");
     $("#kv-cache-show-notifications").prop("checked", settings.showNotifications).trigger("input");
-    $("#kv-cache-validate").prop("checked", settings.validateCache).trigger("input");
+    $("#kv-cache-validate").prop("checked", settings.checkSlotUsage).trigger("input");
     
 }
 
 // Показ toast-уведомления
 function showToast(type, message, title = 'KV Cache Manager') {
     if (typeof toastr === 'undefined') {
-        console.log(`[KV Cache Manager] ${title}: ${message}`);
+        console.debug(`[KV Cache Manager] ${title}: ${message}`);
         return;
     }
 
@@ -76,7 +76,6 @@ function onEnabledChange(event) {
     const value = Boolean($(event.target).prop("checked"));
     extensionSettings.enabled = value;
     saveSettingsDebounced();
-    showToast('success', `Автосохранение ${value ? 'включено' : 'отключено'}`);
 }
 
 function onSaveIntervalChange(event) {
@@ -109,15 +108,15 @@ function onShowNotificationsChange(event) {
 
 function onValidateChange(event) {
     const value = Boolean($(event.target).prop("checked"));
-    extensionSettings.validateCache = value;
+    extensionSettings.checkSlotUsage = value;
     saveSettingsDebounced();
-    showToast('success', `Проверка валидности ${value ? 'включена' : 'отключена'}`);
+    showToast('success', `Проверка использования слота перед сохранением ${value ? 'включена' : 'отключена'}`);
 }
 
 // Получение URL llama.cpp сервера
 function getLlamaUrl() {
     const provided_url = textgenerationwebui_settings.server_urls[textgen_types.LLAMACPP]
-    showToast('warning', 'provided_url: ' + provided_url);
+    console.debug('Lllamacpp server URL: ' + provided_url);
     return provided_url;
 }
 
@@ -283,7 +282,7 @@ async function getAllSlotsInfo() {
 }
 
 // Проверка валидности слота (есть ли в нем данные)
-function isSlotValid(slotInfo) {
+function slotUsed(slotInfo) {
     if (!slotInfo || typeof slotInfo !== 'object') {
         return false;
     }
@@ -316,14 +315,14 @@ async function getActiveSlots() {
     }
     
     // Если проверка отключена, возвращаем все слоты
-    if (!settings.validateCache) {
+    if (!settings.checkSlotUsage) {
         return Array.from({ length: slotsArray.length }, (_, i) => i);
     }
     
     // Фильтруем валидные слоты
     const validSlots = [];
     slotsArray.forEach((slotInfo, index) => {
-        if (isSlotValid(slotInfo)) {
+        if (slotUsed(slotInfo)) {
             validSlots.push(index);
         }
     });
@@ -374,7 +373,7 @@ async function saveSlotCache(slotId, filename) {
     const url = `${llamaUrl}slots/${slotId}?action=save`;
     const requestBody = { filename: filename };
     
-    console.log(`[KV Cache Manager] Сохранение кеша: URL=${url}, filename=${filename}`);
+    console.debug(`[KV Cache Manager] Сохранение кеша: URL=${url}, filename=${filename}`);
     
     try {
         const controller = new AbortController();
@@ -391,7 +390,7 @@ async function saveSlotCache(slotId, filename) {
         
         clearTimeout(timeoutId);
         
-        console.log(`[KV Cache Manager] Ответ сервера: status=${response.status}, ok=${response.ok}`);
+        console.debug(`[KV Cache Manager] Ответ сервера: status=${response.status}, ok=${response.ok}`);
         
         if (!response.ok) {
             const errorText = await response.text();
@@ -399,7 +398,7 @@ async function saveSlotCache(slotId, filename) {
             return false;
         }
         
-        console.log(`[KV Cache Manager] Кеш успешно сохранен для слота ${slotId}`);
+        console.debug(`[KV Cache Manager] Кеш успешно сохранен для слота ${slotId}`);
         return true;
     } catch (e) {
         if (e.name === 'AbortError') {
@@ -418,7 +417,7 @@ async function loadSlotCache(slotId, filename) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 минут таймаут
         
-        console.log(`[KV Cache Manager] Загрузка кеша: слот ${slotId}, файл ${filename}`);
+        console.debug(`[KV Cache Manager] Загрузка кеша: слот ${slotId}, файл ${filename}`);
         
         const response = await fetch(`${llamaUrl}slots/${slotId}?action=restore`, {
             method: 'POST',
@@ -437,7 +436,7 @@ async function loadSlotCache(slotId, filename) {
             return false;
         }
         
-        console.log(`[KV Cache Manager] Кеш успешно загружен для слота ${slotId}`);
+        console.debug(`[KV Cache Manager] Кеш успешно загружен для слота ${slotId}`);
         return true;
     } catch (e) {
         if (e.name === 'AbortError') {
@@ -550,8 +549,7 @@ function groupSavesByChatAndTimestamp(saves) {
 }
 
 // Проверка доступности llama.cpp сервера
-async function checkServerAvailability() {
-    const llamaUrl = getLlamaUrl();
+async function checkServerAvailability(llamaUrl) {
     try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 секунд таймаут
@@ -600,7 +598,7 @@ async function onSaveButtonClick() {
     }
     
     showToast('info', `Найдено ${slots.length} активных слотов`);
-    console.log(`[KV Cache Manager] Начинаю сохранение ${slots.length} слотов с именем "${userName}":`, slots);
+    console.debug(`[KV Cache Manager] Начинаю сохранение ${slots.length} слотов с именем "${userName}":`, slots);
     
     let savedCount = 0;
     let errors = [];
@@ -611,11 +609,11 @@ async function onSaveButtonClick() {
     for (const slotId of slots) {
         try {
             const filename = generateManualSaveFilename(userName.trim(), slotId);
-            console.log(`[KV Cache Manager] Сохранение слота ${slotId} с именем файла: ${filename}`);
+            console.debug(`[KV Cache Manager] Сохранение слота ${slotId} с именем файла: ${filename}`);
             if (await saveSlotCache(slotId, filename)) {
                 savedCount++;
                 savedFiles.push({ filename: filename, slotId: slotId });
-                console.log(`[KV Cache Manager] Сохранен кеш для слота ${slotId}: ${filename}`);
+                console.debug(`[KV Cache Manager] Сохранен кеш для слота ${slotId}: ${filename}`);
             } else {
                 errors.push(`слот ${slotId}`);
             }
@@ -659,8 +657,6 @@ async function onLoadButtonClick() {
         return;
     }
     
-    showToast('info', `Найдено сохранений: ${savesList.length}`);
-    
     // Группируем сохранения по имени чата и timestamp
     const groups = groupSavesByChatAndTimestamp(savesList);
     const groupKeys = Object.keys(groups).sort().reverse(); // Сортируем по убыванию (новые первыми)
@@ -669,8 +665,6 @@ async function onLoadButtonClick() {
         showToast('warning', 'Не найдено сохранений для загрузки');
         return;
     }
-    
-    showToast('info', `Найдено групп сохранений: ${groupKeys.length}`);
     
     // Формируем список для выбора
     const options = groupKeys.map((key, index) => {
@@ -722,8 +716,7 @@ async function onLoadButtonClick() {
         return;
     }
     
-    showToast('info', `Найдено ${filesToLoad.length} файлов для загрузки`);
-    console.log(`[KV Cache Manager] Начинаю загрузку ${filesToLoad.length} файлов:`, filesToLoad);
+    console.debug(`[KV Cache Manager] Начинаю загрузку ${filesToLoad.length} файлов:`, filesToLoad);
     
     let loadedCount = 0;
     let errors = [];
@@ -732,7 +725,7 @@ async function onLoadButtonClick() {
         try {
             if (await loadSlotCache(slotId, filename)) {
                 loadedCount++;
-                console.log(`[KV Cache Manager] Загружен кеш для слота ${slotId} из файла ${filename}`);
+                console.debug(`[KV Cache Manager] Загружен кеш для слота ${slotId} из файла ${filename}`);
             } else {
                 errors.push(`слот ${slotId}`);
             }
@@ -774,7 +767,7 @@ async function onSaveNowButtonClick() {
     }
     
     showToast('info', `Найдено ${slots.length} активных слотов`);
-    console.log(`[KV Cache Manager] Начинаю сохранение ${slots.length} слотов:`, slots);
+    console.debug(`[KV Cache Manager] Начинаю сохранение ${slots.length} слотов:`, slots);
     
     let savedCount = 0;
     let errors = [];
@@ -785,11 +778,11 @@ async function onSaveNowButtonClick() {
     for (const slotId of slots) {
         try {
             const filename = generateAutoSaveFilename(slotId);
-            console.log(`[KV Cache Manager] Сохранение слота ${slotId} с именем файла: ${filename}`);
+            console.debug(`[KV Cache Manager] Сохранение слота ${slotId} с именем файла: ${filename}`);
             if (await saveSlotCache(slotId, filename)) {
                 savedCount++;
                 savedFiles.push({ filename: filename, slotId: slotId });
-                console.log(`[KV Cache Manager] Сохранен кеш для слота ${slotId}: ${filename}`);
+                console.debug(`[KV Cache Manager] Сохранен кеш для слота ${slotId}: ${filename}`);
             } else {
                 errors.push(`слот ${slotId}`);
             }

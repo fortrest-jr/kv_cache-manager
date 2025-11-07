@@ -563,7 +563,7 @@ async function checkServerAvailability(llamaUrl) {
         return response.ok;
     } catch (e) {
         if (e.name !== 'AbortError') {
-            console.debug('[KV Cache Manager] Сервер недоступен:', e);
+            console.debug(`[KV Cache Manager] Сервер (url ${llamaUrl}health) недоступен:`, e);
         }
         return false;
     }

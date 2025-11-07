@@ -136,16 +136,6 @@ function getCurrentChatName() {
     return 'chat';
 }
 
-// Получение имени текущего персонажа
-function getCurrentCharacterName() {
-    const context = getContext();
-    if (context.characterId !== undefined && context.characters && context.characters[context.characterId]) {
-        return context.characters[context.characterId].name;
-    }
-    // Для групповых чатов или если персонаж не выбран
-    return null;
-}
-
 // Получение количества слотов из ответа /slots
 function getSlotsCountFromData(slotsData) {
     if (Array.isArray(slotsData)) {
@@ -154,78 +144,6 @@ function getSlotsCountFromData(slotsData) {
         return Object.keys(slotsData).length;
     }
     return 0;
-}
-
-// Определение количества слотов через API (для обратной совместимости, если проверка отключена)
-async function detectSlotsCount() {
-    const llamaUrl = getLlamaUrl();
-    
-    try {
-        // Пробуем получить через /slots
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
-        
-        const response = await fetch(`${llamaUrl}slots`, {
-            method: 'GET',
-            signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (response.ok) {
-            const data = await response.json();
-            
-            if (Array.isArray(data)) {
-                return data.length;
-            } else if (typeof data === 'object') {
-                // Если это объект, считаем количество ключей
-                const keys = Object.keys(data);
-                return keys.length;
-            }
-        }
-    } catch (e) {
-        if (e.name !== 'AbortError') {
-            console.debug('[KV Cache Manager] Ошибка определения количества слотов через /slots:', e);
-        }
-    }
-    
-    // Fallback: пробуем перебрать слоты до 32
-    for (let i = 0; i < 32; i++) {
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 2000);
-            
-            const response = await fetch(`${llamaUrl}slots/${i}`, {
-                method: 'GET',
-                signal: controller.signal
-            });
-            
-            clearTimeout(timeoutId);
-            
-            if (!response.ok && response.status === 404) {
-                // Если слот не существует, возвращаем предыдущий индекс + 1
-                return i;
-            }
-        } catch (e) {
-            if (e.name !== 'AbortError') {
-                // Если ошибка не таймаут, возможно это последний слот
-                return i;
-            }
-        }
-    }
-    
-    // Если ничего не получилось, возвращаем дефолтное значение
-    return 2;
-}
-
-
-// Получение ID текущего чата
-function getCurrentChatId() {
-    const context = getContext();
-    if (context.chat && context.chat.id) {
-        return String(context.chat.id);
-    }
-    return 'default';
 }
 
 // Формирование timestamp для имени файла (YYYYMMDDHHMMSS)
@@ -275,6 +193,7 @@ async function getAllSlotsInfo() {
     } catch (e) {
         if (e.name !== 'AbortError') {
             console.debug('[KV Cache Manager] Ошибка получения информации о слотах:', e);
+            showToast('error', 'Ошибка получения информации о слотах:', e);
         }
     }
     
@@ -448,42 +367,6 @@ async function loadSlotCache(slotId, filename) {
     }
 }
 
-// Парсинг имени файла для извлечения имени чата, timestamp и slotId
-function parseCacheFilename(filename) {
-    // Формат: {chat_name}_{timestamp}_slot{slotId}.bin
-    // или: {user_name}_{chat_name}_{timestamp}_slot{slotId}.bin
-    const match = filename.match(/^(.+?)_(\d{14})_slot(\d+)\.bin$/);
-    if (match) {
-        const fullPrefix = match[1];
-        const timestamp = match[2];
-        const slotId = parseInt(match[3], 10);
-        
-        // Разделяем префикс на части
-        // Для ручных сохранений: user_chat, для автосохранений: chat
-        const parts = fullPrefix.split('_');
-        let chatName, userName = null;
-        
-        if (parts.length === 1) {
-            // Просто имя чата
-            chatName = parts[0];
-        } else {
-            // Возможно, это user_chat формат
-            // Берем последнюю часть как имя чата, остальное - имя пользователя
-            chatName = parts[parts.length - 1];
-            userName = parts.slice(0, -1).join('_');
-        }
-        
-        return {
-            chatName: chatName,
-            userName: userName,
-            timestamp: timestamp,
-            slotId: slotId,
-            isValid: true
-        };
-    }
-    return { isValid: false };
-}
-
 // Получение списка сохранений из настроек
 function getSavesList() {
     const settings = extensionSettings || defaultSettings;
@@ -548,28 +431,6 @@ function groupSavesByChatAndTimestamp(saves) {
     return groups;
 }
 
-// Проверка доступности llama.cpp сервера
-async function checkServerAvailability(llamaUrl) {
-    try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 секунд таймаут
-        
-        const response = await fetch(`${llamaUrl}health`, {
-            method: 'GET',
-            signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        return response.ok;
-    } catch (e) {
-        if (e.name !== 'AbortError') {
-            console.debug(`[KV Cache Manager] Сервер (url ${llamaUrl}health) недоступен:`, e);
-        }
-        showToast('error', `Сервер llama.cpp недоступен: ${llamaUrl}health`);
-        return false;
-    }
-}
-
 // Обработчики для кнопок
 async function onSaveButtonClick() {
     const userName = prompt('Введите имя для сохранения:');
@@ -583,11 +444,6 @@ async function onSaveButtonClick() {
     
     showToast('info', 'Начинаю сохранение кеша...');
     
-    // Проверка доступности сервера
-    const isServerAvailable = await checkServerAvailability();
-    if (!isServerAvailable) {
-        return;
-    }
     
     // Получаем все валидные слоты
     const slots = await getActiveSlots();
@@ -641,12 +497,6 @@ async function onSaveButtonClick() {
 
 async function onLoadButtonClick() {
     showToast('info', 'Начинаю загрузку кеша...');
-    
-    // Проверка доступности сервера
-    const isServerAvailable = await checkServerAvailability();
-    if (!isServerAvailable) {
-        return;
-    }
     
     // Получаем список сохранений из настроек
     const savesList = getSavesList();
@@ -749,12 +599,6 @@ async function onLoadButtonClick() {
 
 async function onSaveNowButtonClick() {
     showToast('info', 'Начинаю сохранение кеша...');
-    
-    // Проверка доступности сервера
-    const isServerAvailable = await checkServerAvailability();
-    if (!isServerAvailable) {
-        return;
-    }
     
     // Получаем все валидные слоты
     const slots = await getActiveSlots();

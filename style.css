@@ -12,10 +12,10 @@
     margin-bottom: 10px;
 }
 
-.kv-cache-manager-field input[type="number"],
-.kv-cache-manager-field input[type="text"] {
-    width: 200px;
-    color: var(--SmartThemeBodyColor, inherit);
+/* Поля ввода используют стили text_pole из SillyTavern */
+.kv-cache-manager-field input[type="number"] {
+    width: auto;
+    min-width: 100px;
 }
 
 .kv-cache-manager-info {

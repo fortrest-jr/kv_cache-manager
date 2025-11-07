@@ -6,27 +6,15 @@
         </div>
         <div class="inline-drawer-content">
             <div class="kv-cache-manager-section">
-                <h3>Автоматическое сохранение</h3>
-                <div class="kv-cache-manager-field flex-container">
-                    <input type="checkbox" id="kv-cache-enabled" />
-                    <label for="kv-cache-enabled">Включить автосохранение</label>
-                </div>
-                <div class="kv-cache-manager-field flex-container">
-                    <label for="kv-cache-save-interval">Сохранять каждые N сообщений:</label>
-                    <input type="number" id="kv-cache-save-interval" min="1" value="5" />
-                </div>
-                <div class="kv-cache-manager-field">
-                    <span id="kv-cache-next-save">Следующее сохранение через: - сообщений</span>
-                </div>
-            </div>
-
-            <hr class="sysHR" />
-
-            <div class="kv-cache-manager-section">
                 <h3>Управление кешем</h3>
+                <div class="kv-cache-manager-field">
+                    <p><strong>Активные слоты для сохранения:</strong></p>
+                    <div id="kv-cache-slots-list" class="kv-cache-manager-info">
+                        <p>Загрузка...</p>
+                    </div>
+                </div>
                 <div class="kv-cache-manager-field flex-container">
-                    <label for="kv-cache-save-name">Имя для сохранения:</label>
-                    <input type="text" id="kv-cache-save-name" placeholder="Введите имя" />
+                    <input id="kv-cache-save-now-button" class="menu_button" type="submit" value="Сохранить сейчас" />
                 </div>
                 <div class="kv-cache-manager-field flex-container">
                     <input id="kv-cache-save-button" class="menu_button" type="submit" value="Сохранить с именем" />
@@ -39,33 +27,9 @@
             <hr class="sysHR" />
 
             <div class="kv-cache-manager-section">
-                <h3>Настройки ротации</h3>
-                <div class="kv-cache-manager-field flex-container">
-                    <label for="kv-cache-max-files">Максимум файлов на сессию (только для автосохранений):</label>
-                    <input type="number" id="kv-cache-max-files" min="1" value="10" />
-                </div>
-            </div>
-
-            <hr class="sysHR" />
-
-            <div class="kv-cache-manager-section">
-                <h3>Статистика и последнее сохранение</h3>
-                <div id="kv-cache-last-save" class="kv-cache-manager-info">
-                    <p><strong>Последнее сохранение:</strong></p>
-                    <p id="kv-cache-last-save-info">Нет данных</p>
-                </div>
-                <div id="kv-cache-statistics" class="kv-cache-manager-info">
-                    <p><strong>Статистика:</strong></p>
-                    <p id="kv-cache-stats-info">Нет данных</p>
-                </div>
-            </div>
-
-            <hr class="sysHR" />
-
-            <div class="kv-cache-manager-section">
                 <h3>Дополнительные настройки</h3>
                 <div class="kv-cache-manager-field flex-container">
-                    <input type="checkbox" id="kv-cache-auto-load" />
+                    <input type="checkbox" id="kv-cache-auto-load" disabled />
                     <label for="kv-cache-auto-load">Автозагрузка при переключении на чат</label>
                 </div>
                 <div class="kv-cache-manager-field flex-container">
@@ -74,8 +38,28 @@
                 </div>
                 <div class="kv-cache-manager-field flex-container">
                     <input type="checkbox" id="kv-cache-validate" />
-                    <label for="kv-cache-validate">Проверять валидность кеша</label>
+                    <label for="kv-cache-validate">Проверять использование слота</label>
                 </div>
+            </div>
+
+            <hr class="sysHR" />
+
+            <div class="kv-cache-manager-section">
+                <h3>Автоматическое сохранение</h3>
+                <div class="kv-cache-manager-field flex-container">
+                    <input type="checkbox" id="kv-cache-enabled" disabled />
+                    <label for="kv-cache-enabled">Включить автосохранение</label>
+                </div>
+                <div class="kv-cache-manager-field flex-container">
+                    <label for="kv-cache-save-interval">Сохранять каждые N сообщений:</label>
+                    <input type="number" id="kv-cache-save-interval" class="text_pole" min="1" value="5" disabled />
+                </div>
+                <div class="kv-cache-manager-field flex-container">
+                    <label for="kv-cache-max-files">Максимум файлов на сессию:</label>
+                    <input type="number" id="kv-cache-max-files" class="text_pole" min="1" value="10" disabled />
+                </div>
+                <div class="kv-cache-manager-field">
+                    <span id="kv-cache-next-save">Следующее сохранение через: - сообщений</span>
             </div>
 
             <hr class="sysHR" />
@@ -83,3 +67,54 @@
     </div>
 </div>
 
+<!-- Модалка загрузки кеша -->
+<div id="kv-cache-load-modal" class="dialogue_popup" style="display: none;">
+    <div class="dialogue_popup_content">
+        <div class="dialogue_popup_header">
+            <h3>Загрузка кеша</h3>
+            <button class="dialogue_popup_close" id="kv-cache-load-modal-close">
+                <i class="fa-solid fa-times"></i>
+            </button>
+        </div>
+        <div class="dialogue_popup_body">
+            <!-- Поиск -->
+            <div class="kv-cache-load-search">
+                <input type="text" id="kv-cache-load-search-input" class="text_pole" placeholder="Поиск по чату или имени..." />
+            </div>
+            
+            <div class="kv-cache-load-content">
+                <!-- Боковая панель с чатами -->
+                <div class="kv-cache-load-chats">
+                    <div class="kv-cache-load-chat-item kv-cache-load-chat-item-current" data-chat-id="current">
+                        <div class="kv-cache-load-chat-name">
+                            <i class="fa-solid fa-comments"></i>
+                            <span class="kv-cache-load-chat-name-text">Текущий чат</span>
+                        </div>
+                        <div class="kv-cache-load-chat-count">-</div>
+                    </div>
+                    <div id="kv-cache-load-chats-list"></div>
+                </div>
+                
+                <!-- Основная область с файлами -->
+                <div class="kv-cache-load-files">
+                    <div id="kv-cache-load-files-list">
+                        <p class="kv-cache-load-empty">
+                            Выберите чат для просмотра файлов
+                        </p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Кнопки действий -->
+            <div class="dialogue_popup_footer">
+                <div id="kv-cache-load-selected-info">
+                    Файл не выбран
+                </div>
+                <div>
+                    <button id="kv-cache-load-cancel-button" class="menu_button">Отмена</button>
+                    <button id="kv-cache-load-confirm-button" class="menu_button" disabled>Загрузить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

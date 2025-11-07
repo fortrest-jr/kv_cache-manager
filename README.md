@@ -1,6 +1,6 @@
 # KV Cache Manager для SillyTavern
 
-Расширение для управления KV-кешем llama.cpp в SillyTavern.
+Расширение для управления KV-кешем llama.cpp сервера с автоматическим сохранением и загрузкой кеша.
 
 ## Функциональность
 
@@ -19,6 +19,14 @@
 1. Скопируйте папку `kv-cache-manager` в `public/scripts/extensions/` вашей установки SillyTavern
 2. Перезагрузите страницу SillyTavern
 3. Расширение появится в настройках на вкладке "KV Cache Manager"
+
+### Серверный плагин
+
+Для работы функции загрузки файлов необходимо установить серверный плагин:
+
+**Серверный плагин KV Cache Manager**: [https://github.com/fortrest-jr/kv_cache-manager-plugin](https://github.com/fortrest-jr/kv_cache-manager-plugin)
+
+Плагин предоставляет API для получения списка файлов сохранений и их удаления. Без установки плагина функция загрузки кеша будет недоступна.
 
 ## Использование
 
@@ -51,14 +59,16 @@
 
 ## Формат файлов
 
-- **Автосохранения**: `{chat_name}_slot{slot_id}_{timestamp}.bin`
-- **Ручные сохранения**: `{user_name}_{chat_name}_slot{slot_id}_{timestamp}.bin`
+- **Автосохранения**: `{chat_name}_{character_name}_{timestamp}.bin`
+- **Ручные сохранения**: `{user_name}_{chat_name}_{character_name}_{timestamp}.bin`
+
+> **Примечание**: Имена файлов содержат имена персонажей вместо номеров слотов для обеспечения корректной загрузки даже при изменении порядка слотов.
 
 ## Требования
 
 - SillyTavern с поддержкой расширений
-- llama.cpp сервер с поддержкой KV-кеша
-- Расширение llama.cpp-slot-manager (для групповых чатов)
+- llama.cpp сервер с поддержкой KV-кеша и API для работы со слотами
+- Серверный плагин [kv_cache-manager-plugin](https://github.com/fortrest-jr/kv_cache-manager-plugin) (для функции загрузки файлов)
 
 ## Лицензия
 

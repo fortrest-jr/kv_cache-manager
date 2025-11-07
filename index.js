@@ -5,6 +5,7 @@
 // Импортируем необходимые функции
 import { extension_settings, getContext, loadExtensionSettings } from "../../../extensions.js";
 import { saveSettingsDebounced } from "../../../../script.js";
+import { textgen_types, textgenerationwebui_settings } from '../../../textgen-settings.js';
 
 // Имя расширения должно совпадать с именем папки
 const extensionName = "SillyTavern-llamacpp-kv_cache-manager";
@@ -128,7 +129,9 @@ function onApiUrlChange(event) {
 // Получение URL llama.cpp сервера
 function getLlamaUrl() {
     const settings = extension_settings[extensionName] || defaultSettings;
-    return settings.apiUrl || defaultSettings.apiUrl;
+    const provided_url = textgenerationwebui_settings.server_urls[textgen_types.LLAMACPP]
+    showToast('warning', 'provided_url: ' + provided_url);
+    return provided_url || settings.apiUrl || defaultSettings.apiUrl;
 }
 
 // Получение имени текущего чата

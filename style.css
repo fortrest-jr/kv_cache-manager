@@ -238,3 +238,133 @@
     to { transform: rotate(360deg); }
 }
 
+/* Планшеты */
+@media (min-width: 769px) and (max-width: 1024px) {
+    #kv-cache-load-modal .dialogue_popup_content {
+        width: 95vw !important;
+        max-width: 95vw !important;
+    }
+    
+    .kv-cache-load-chats {
+        width: 200px !important;
+    }
+    
+    .kv-cache-load-chat-item {
+        padding: 10px !important;
+        min-height: 40px;
+    }
+    
+    .kv-cache-load-file-item {
+        min-height: 50px;
+    }
+}
+
+/* Адаптивность для мобильных устройств */
+@media (max-width: 768px) {
+    #kv-cache-load-modal .dialogue_popup_content {
+        width: 100vw !important;
+        max-width: 100vw !important;
+        max-height: 100vh !important;
+        margin: 0 !important;
+        border-radius: 0 !important;
+    }
+    
+    #kv-cache-load-modal .dialogue_popup_body {
+        height: calc(100vh - 120px) !important;
+    }
+    
+    /* Вертикальная раскладка на мобильных */
+    .kv-cache-load-content {
+        flex-direction: column !important;
+        gap: 10px !important;
+    }
+    
+    .kv-cache-load-chats {
+        width: 100% !important;
+        border-right: none !important;
+        border-bottom: 1px solid var(--SmartThemeBorderColor) !important;
+        max-height: 220px;
+        padding-right: 0 !important;
+        padding-bottom: 10px;
+        margin-bottom: 10px;
+    }
+    
+    .kv-cache-load-files {
+        flex: 1 !important;
+        width: 100% !important;
+    }
+    
+    /* Увеличиваем размеры touch-элементов */
+    .kv-cache-load-chat-item {
+        padding: 14px !important;
+        min-height: 48px;
+        font-size: 1em;
+    }
+    
+    .kv-cache-load-file-item {
+        padding: 14px 12px !important;
+        min-height: 64px;
+    }
+    
+    .kv-cache-load-file-group-header {
+        padding: 14px !important;
+        min-height: 52px;
+    }
+    
+    /* Адаптируем футер */
+    .dialogue_popup_footer {
+        flex-direction: column !important;
+        gap: 12px !important;
+        align-items: stretch !important;
+    }
+    
+    .dialogue_popup_footer > div:first-child {
+        text-align: center;
+        margin-bottom: 0;
+        font-size: 0.9em;
+    }
+    
+    .dialogue_popup_footer > div:last-child {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 10px !important;
+        width: 100%;
+    }
+    
+    .dialogue_popup_footer .menu_button {
+        width: 100% !important;
+        padding: 14px !important;
+        font-size: 16px; /* Предотвращает zoom на iOS */
+        min-height: 48px;
+    }
+    
+    /* Улучшаем поиск */
+    #kv-cache-load-search-input {
+        padding: 14px !important;
+        font-size: 16px !important; /* Предотвращает zoom на iOS */
+        min-height: 48px;
+    }
+    
+    /* Адаптируем информацию о файлах */
+    .kv-cache-load-file-item-name {
+        font-size: 0.95em;
+        word-break: break-word;
+    }
+    
+    .kv-cache-load-file-item-meta {
+        font-size: 0.9em;
+        flex-wrap: wrap;
+    }
+    
+    /* Улучшаем отображение групп */
+    .kv-cache-load-file-group-title {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    
+    .kv-cache-load-file-group-info {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+}
+

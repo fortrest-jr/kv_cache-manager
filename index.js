@@ -140,21 +140,18 @@ function onSaveIntervalChange(event) {
     extensionSettings.saveInterval = value;
     saveSettingsDebounced();
     updateNextSaveIndicator();
-    showToast('info', `Интервал сохранения установлен: ${value} сообщений`);
 }
 
 function onMaxFilesChange(event) {
     const value = parseInt($(event.target).val()) || 10;
     extensionSettings.maxFiles = value;
     saveSettingsDebounced();
-    showToast('info', `Максимум файлов установлен: ${value}`);
 }
 
 function onAutoLoadChange(event) {
     const value = Boolean($(event.target).prop("checked"));
     extensionSettings.autoLoadOnChatSwitch = value;
     saveSettingsDebounced();
-    showToast('success', `Автозагрузка ${value ? 'включена' : 'отключена'}`);
 }
 
 function onShowNotificationsChange(event) {
@@ -168,7 +165,6 @@ function onValidateChange(event) {
     const value = Boolean($(event.target).prop("checked"));
     extensionSettings.checkSlotUsage = value;
     saveSettingsDebounced();
-    showToast('success', `Проверка использования слота ${value ? 'включена' : 'отключена'}`);
 }
 
 // Получение URL llama.cpp сервера
@@ -564,7 +560,6 @@ async function saveCache(requestUserName = false) {
         return false; // Нет слотов для сохранения
     }
     
-    showToast('info', `Найдено ${slots.length} активных слотов`);
     console.debug(`[KV Cache Manager] Начинаю сохранение ${slots.length} слотов:`, slots);
     
     // Генерируем timestamp один раз для всех слотов в этом сохранении
@@ -759,13 +754,6 @@ async function openLoadModal() {
     
     // Группируем файлы по чатам
     loadModalData.chats = groupFilesByChat(filesList);
-    
-    if (Object.keys(loadModalData.chats).length === 0) {
-        $("#kv-cache-load-files-list").html('<div class="kv-cache-load-empty">Не найдено сохранений для загрузки</div>');
-        showToast('warning', 'Не найдено сохранений для загрузки');
-        return;
-    }
-    
     // Получаем текущий chatId и нормализуем его (как в generateSaveFilename)
     const rawChatId = getCurrentChatId() || 'unknown';
     loadModalData.currentChatId = String(rawChatId).replace(/[^a-zA-Z0-9_-]/g, '_');

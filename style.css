@@ -47,3 +47,194 @@
     color: var(--SmartThemeBodyColor, inherit);
 }
 
+/* Стили для модалки загрузки */
+#kv-cache-load-modal {
+    z-index: 10000;
+}
+
+.kv-cache-load-chat-item {
+    padding: 10px;
+    margin-bottom: 5px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border: 1px solid transparent;
+}
+
+.kv-cache-load-chat-item:hover {
+    background-color: var(--SmartThemeBlurTintColor);
+}
+
+.kv-cache-load-chat-item.active {
+    background-color: var(--SmartThemeBlurTintColor);
+    border-color: var(--SmartThemeBorderColor);
+}
+
+.kv-cache-load-chat-item-current {
+    font-weight: 600;
+}
+
+.kv-cache-load-chat-name {
+    display: flex;
+    align-items: center;
+    color: var(--SmartThemeBodyColor);
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.kv-cache-load-chat-count {
+    font-size: 0.85em;
+    color: var(--SmartThemeBodyColor);
+    opacity: 0.7;
+    margin-left: 8px;
+}
+
+.kv-cache-load-file-group {
+    margin-bottom: 15px;
+    border: 1px solid var(--SmartThemeBorderColor);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--SmartThemeBlurTintColor);
+    transition: all 0.2s;
+}
+
+.kv-cache-load-file-group.selected {
+    border-color: var(--SmartThemeBlurTintColor);
+    box-shadow: 0 0 0 2px var(--SmartThemeBlurTintColor);
+}
+
+.kv-cache-load-file-group-header {
+    padding: 12px 15px;
+    background: var(--SmartThemeBlurTintColor);
+    border-bottom: 1px solid var(--SmartThemeBorderColor);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+}
+
+.kv-cache-load-file-group-header:hover {
+    background: var(--SmartThemeBlurTintColor);
+    opacity: 0.9;
+}
+
+.kv-cache-load-file-group-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--SmartThemeBodyColor);
+    font-weight: 500;
+}
+
+.kv-cache-load-file-group-info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    font-size: 0.9em;
+    color: var(--SmartThemeBodyColor);
+    opacity: 0.8;
+}
+
+.kv-cache-load-file-group-toggle {
+    margin-left: auto;
+    transition: transform 0.2s;
+}
+
+.kv-cache-load-file-group.collapsed .kv-cache-load-file-group-toggle {
+    transform: rotate(-90deg);
+}
+
+.kv-cache-load-file-group-content {
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.kv-cache-load-file-group.collapsed .kv-cache-load-file-group-content {
+    display: none;
+}
+
+.kv-cache-load-file-item {
+    padding: 10px 12px;
+    border-radius: 4px;
+    border: 1px solid var(--SmartThemeBorderColor);
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--SmartThemeBlurTintColor);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.kv-cache-load-file-item:hover {
+    background: var(--SmartThemeBlurTintColor);
+    border-color: var(--SmartThemeBorderColor);
+    transform: translateX(2px);
+}
+
+.kv-cache-load-file-item.selected {
+    background: var(--SmartThemeBlurTintColor);
+    border-color: var(--SmartThemeBlurTintColor);
+    box-shadow: 0 0 0 2px var(--SmartThemeBlurTintColor);
+}
+
+.kv-cache-load-file-item-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.kv-cache-load-file-item-name {
+    color: var(--SmartThemeBodyColor);
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.kv-cache-load-file-item-meta {
+    font-size: 0.85em;
+    color: var(--SmartThemeBodyColor);
+    opacity: 0.7;
+    display: flex;
+    gap: 12px;
+}
+
+.kv-cache-load-file-item-slot {
+    padding: 4px 8px;
+    background: var(--SmartThemeBlurTintColor);
+    border-radius: 3px;
+    font-size: 0.85em;
+    color: var(--SmartThemeBodyColor);
+}
+
+.kv-cache-load-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--SmartThemeBodyColor);
+    opacity: 0.6;
+}
+
+.kv-cache-load-loading {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--SmartThemeBodyColor);
+}
+
+.kv-cache-load-loading i {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+

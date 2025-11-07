@@ -607,163 +607,318 @@ function formatTimestampToDate(timestamp) {
     return `${dateStr} ${timeStr}`;
 }
 
-// Внутренняя функция для отображения модалки загрузки для конкретного чата
-async function showLoadModalForChat(targetChatId = null) {
-    showToast('info', 'Начинаю загрузку кеша...');
+// Глобальные переменные для модалки загрузки
+let loadModalData = {
+    chats: {},
+    currentChatId: null,
+    selectedGroup: null,
+    searchQuery: ''
+};
+
+// Открытие модалки загрузки
+async function openLoadModal() {
+    const modal = $("#kv-cache-load-modal");
+    modal.show();
     
-    // Получаем список файлов через API плагина
+    // Показываем загрузку
+    $("#kv-cache-load-files-list").html('<div class="kv-cache-load-loading"><i class="fa-solid fa-spinner"></i> Загрузка файлов...</div>');
+    
+    // Получаем список файлов
     const filesList = await getFilesList();
     
     if (!filesList || filesList.length === 0) {
-        showToast('warning', 'Не найдено сохранений для загрузки. Сначала сохраните кеш.');
+        $("#kv-cache-load-files-list").html('<div class="kv-cache-load-empty">Не найдено сохранений для загрузки. Сначала сохраните кеш.</div>');
+        showToast('warning', 'Не найдено сохранений для загрузки');
         return;
     }
     
     // Группируем файлы по чатам
-    const chats = groupFilesByChat(filesList);
+    loadModalData.chats = groupFilesByChat(filesList);
     
-    if (Object.keys(chats).length === 0) {
+    if (Object.keys(loadModalData.chats).length === 0) {
+        $("#kv-cache-load-files-list").html('<div class="kv-cache-load-empty">Не найдено сохранений для загрузки</div>');
         showToast('warning', 'Не найдено сохранений для загрузки');
         return;
     }
     
     // Получаем текущий chatId
-    const currentChatId = targetChatId || getCurrentChatId() || 'unknown';
+    loadModalData.currentChatId = getCurrentChatId() || 'unknown';
     
-    // Разделяем чаты на текущий и остальные
+    // Отображаем чаты и файлы
+    renderLoadModalChats();
+    selectLoadModalChat('current');
+}
+
+// Закрытие модалки загрузки
+function closeLoadModal() {
+    const modal = $("#kv-cache-load-modal");
+    modal.hide();
+    loadModalData.selectedGroup = null;
+    loadModalData.searchQuery = '';
+    $("#kv-cache-load-search-input").val('');
+    $("#kv-cache-load-confirm-button").prop('disabled', true);
+    $("#kv-cache-load-selected-info").text('Файл не выбран');
+}
+
+// Отображение списка чатов
+function renderLoadModalChats() {
+    const chatsList = $("#kv-cache-load-chats-list");
+    const currentChatId = loadModalData.currentChatId;
+    const chats = loadModalData.chats;
+    
+    // Обновляем счетчик для текущего чата
     const currentChatGroups = chats[currentChatId] || [];
-    const otherChats = Object.keys(chats).filter(chatId => chatId !== currentChatId);
+    const currentCount = currentChatGroups.reduce((sum, g) => sum + g.files.length, 0);
+    $(".kv-cache-load-chat-item-current .kv-cache-load-chat-count").text(currentCount > 0 ? currentCount : '-');
     
-    // Формируем список для выбора
-    let options = [];
-    let currentChatIndex = 0;
-    let otherChatsIndex = 0;
+    // Фильтруем чаты по поисковому запросу
+    const searchQuery = loadModalData.searchQuery.toLowerCase();
+    const filteredChats = Object.keys(chats).filter(chatId => {
+        if (chatId === currentChatId) return true;
+        if (searchQuery && !chatId.toLowerCase().includes(searchQuery)) return false;
+        return true;
+    });
     
-    // Сначала показываем файлы текущего чата (цифры)
-    if (currentChatGroups.length > 0) {
-        options.push('=== Текущий чат ===');
-        for (const group of currentChatGroups) {
-            const dateTime = formatTimestampToDate(group.timestamp);
-            const slotsCount = group.files.length;
-            
-            let infoParts = [];
-            if (group.userName) {
-                infoParts.push(`[${group.userName}]`);
-            }
-            infoParts.push(dateTime);
-            infoParts.push(`(${slotsCount} слот${slotsCount !== 1 ? 'ов' : ''})`);
-            
-            options.push(`${currentChatIndex + 1}. ${infoParts.join(' - ')}`);
-            currentChatIndex++;
-        }
+    // Очищаем список
+    chatsList.empty();
+    
+    // Добавляем другие чаты
+    for (const chatId of filteredChats) {
+        if (chatId === currentChatId) continue;
+        
+        const chatGroups = chats[chatId];
+        const totalFiles = chatGroups.reduce((sum, g) => sum + g.files.length, 0);
+        const latestGroup = chatGroups[0];
+        const dateTime = formatTimestampToDate(latestGroup.timestamp);
+        
+        const chatItem = $(`
+            <div class="kv-cache-load-chat-item" data-chat-id="${chatId}">
+                <div class="kv-cache-load-chat-name">
+                    <i class="fa-solid fa-comment" style="margin-right: 5px;"></i>
+                    ${chatId}
+                </div>
+                <div class="kv-cache-load-chat-count">${totalFiles}</div>
+            </div>
+        `);
+        
+        chatItem.on('click', () => selectLoadModalChat(chatId));
+        chatsList.append(chatItem);
+    }
+}
+
+// Выбор чата в модалке
+function selectLoadModalChat(chatId) {
+    // Убираем активный класс со всех чатов
+    $(".kv-cache-load-chat-item").removeClass('active');
+    
+    // Устанавливаем активный класс
+    if (chatId === 'current') {
+        $(".kv-cache-load-chat-item-current").addClass('active');
+        chatId = loadModalData.currentChatId;
+    } else {
+        $(`.kv-cache-load-chat-item[data-chat-id="${chatId}"]`).addClass('active');
     }
     
-    // Затем показываем другие чаты (буквы)
-    if (otherChats.length > 0) {
-        if (currentChatGroups.length > 0) {
-            options.push('');
-        }
-        options.push('=== Другие чаты ===');
-        for (const chatId of otherChats) {
-            const chatGroups = chats[chatId];
-            const latestGroup = chatGroups[0]; // Самый свежий файл в чате
-            const dateTime = formatTimestampToDate(latestGroup.timestamp);
-            const totalFiles = chatGroups.reduce((sum, g) => sum + g.files.length, 0);
-            
-            options.push(`${String.fromCharCode(65 + otherChatsIndex)}. Chat: ${chatId} - ${dateTime} (${totalFiles} файл${totalFiles !== 1 ? 'ов' : ''})`);
-            otherChatsIndex++;
-        }
-    }
+    // Отображаем файлы выбранного чата
+    renderLoadModalFiles(chatId);
     
-    if (options.length === 0) {
-        showToast('warning', 'Не найдено сохранений для загрузки');
+    // Сбрасываем выбор
+    loadModalData.selectedGroup = null;
+    $(".kv-cache-load-file-item").removeClass('selected');
+    $(".kv-cache-load-file-group").removeClass('selected');
+    $("#kv-cache-load-confirm-button").prop('disabled', true);
+    $("#kv-cache-load-selected-info").text('Файл не выбран');
+}
+
+// Отображение файлов выбранного чата
+function renderLoadModalFiles(chatId) {
+    const filesList = $("#kv-cache-load-files-list");
+    const chats = loadModalData.chats;
+    const chatGroups = chats[chatId] || [];
+    const searchQuery = loadModalData.searchQuery.toLowerCase();
+    
+    if (chatGroups.length === 0) {
+        filesList.html('<div class="kv-cache-load-empty">Нет файлов для этого чата</div>');
         return;
     }
     
-    const promptText = `Выберите сохранение для загрузки:\n\n${options.join('\n')}\n\nВведите номер (1-${currentChatIndex}) для текущего чата или букву (${otherChats.length > 0 ? 'A-' + String.fromCharCode(64 + otherChats.length) : 'нет'}) для другого чата:`;
-    const choice = prompt(promptText);
+    // Фильтруем группы по поисковому запросу
+    const filteredGroups = chatGroups.filter(group => {
+        if (!searchQuery) return true;
+        const userName = (group.userName || '').toLowerCase();
+        const timestamp = group.timestamp;
+        const dateTime = formatTimestampToDate(timestamp).toLowerCase();
+        return userName.includes(searchQuery) || dateTime.includes(searchQuery) || timestamp.includes(searchQuery);
+    });
     
-    if (!choice) {
+    if (filteredGroups.length === 0) {
+        filesList.html('<div class="kv-cache-load-empty">Не найдено файлов по запросу</div>');
         return;
     }
     
-    const choiceUpper = choice.trim().toUpperCase();
+    filesList.empty();
     
-    // Проверяем, выбрана ли буква (другой чат)
-    if (choiceUpper.length === 1 && choiceUpper >= 'A' && choiceUpper <= 'Z') {
-        const chatIndex = choiceUpper.charCodeAt(0) - 65;
-        if (chatIndex >= 0 && chatIndex < otherChats.length) {
-            const selectedChatId = otherChats[chatIndex];
-            // Рекурсивно открываем модалку для выбранного чата
-            await showLoadModalForChat(selectedChatId);
-            return;
+    // Отображаем группы файлов (сгруппированные по timestamp)
+    for (const group of filteredGroups) {
+        const dateTime = formatTimestampToDate(group.timestamp);
+        const slotsCount = group.files.length;
+        const userName = group.userName ? `[${group.userName}]` : '';
+        
+        const groupElement = $(`
+            <div class="kv-cache-load-file-group" data-group-timestamp="${group.timestamp}">
+                <div class="kv-cache-load-file-group-header">
+                    <div class="kv-cache-load-file-group-title">
+                        <i class="fa-solid fa-calendar"></i>
+                        ${dateTime}
+                        ${userName ? `<span style="opacity: 0.7;">${userName}</span>` : ''}
+                    </div>
+                    <div class="kv-cache-load-file-group-info">
+                        <span>${slotsCount} слот${slotsCount !== 1 ? 'ов' : ''}</span>
+                        <i class="fa-solid fa-chevron-down kv-cache-load-file-group-toggle"></i>
+                    </div>
+                </div>
+                <div class="kv-cache-load-file-group-content">
+                </div>
+            </div>
+        `);
+        
+        // Добавляем файлы в группу
+        const content = groupElement.find('.kv-cache-load-file-group-content');
+        for (const filename of group.files) {
+            const parsed = parseSaveFilename(filename);
+            if (!parsed) continue;
+            
+            const fileItem = $(`
+                <div class="kv-cache-load-file-item" data-filename="${filename}" data-timestamp="${group.timestamp}">
+                    <div class="kv-cache-load-file-item-info">
+                        <div class="kv-cache-load-file-item-name">
+                            <i class="fa-solid fa-file"></i>
+                            ${filename}
+                        </div>
+                        <div class="kv-cache-load-file-item-meta">
+                            <span>Слот ${parsed.slotId}</span>
+                        </div>
+                    </div>
+                </div>
+            `);
+            
+            fileItem.on('click', function(e) {
+                e.stopPropagation();
+                
+                // Убираем выделение с других элементов
+                $(".kv-cache-load-file-item").removeClass('selected');
+                $(".kv-cache-load-file-group").removeClass('selected');
+                
+                // Выделяем всю группу
+                groupElement.addClass('selected');
+                fileItem.addClass('selected');
+                
+                // Сохраняем выбранную группу
+                loadModalData.selectedGroup = group;
+                
+                // Активируем кнопку загрузки
+                $("#kv-cache-load-confirm-button").prop('disabled', false);
+                $("#kv-cache-load-selected-info").html(`
+                    <strong>Выбрано:</strong> ${dateTime} ${userName} (${slotsCount} слот${slotsCount !== 1 ? 'ов' : ''})
+                `);
+            });
+            
+            content.append(fileItem);
         }
-    }
-    
-    // Проверяем, выбрана ли цифра (файл текущего чата)
-    if (!isNaN(choice)) {
-        const index = parseInt(choice, 10) - 1;
-        if (index >= 0 && index < currentChatGroups.length) {
-            const selectedGroup = currentChatGroups[index];
-            
-            // Парсим slotId из имён файлов
-            const filesToLoad = [];
-            for (const filename of selectedGroup.files) {
-                const parsed = parseSaveFilename(filename);
-                if (parsed) {
-                    filesToLoad.push({
-                        filename: filename,
-                        slotId: parsed.slotId
-                    });
-                } else {
-                    console.warn('[KV Cache Manager] Не удалось распарсить имя файла для загрузки:', filename);
-                }
-            }
-            
-            if (filesToLoad.length === 0) {
-                showToast('warning', 'Не найдено файлов для загрузки');
-                return;
-            }
-            
-            console.debug(`[KV Cache Manager] Начинаю загрузку ${filesToLoad.length} файлов:`, filesToLoad);
-            
-            let loadedCount = 0;
-            let errors = [];
-            
-            for (const { filename, slotId } of filesToLoad) {
-                try {
-                    if (await loadSlotCache(slotId, filename)) {
-                        loadedCount++;
-                        console.debug(`[KV Cache Manager] Загружен кеш для слота ${slotId} из файла ${filename}`);
-                    } else {
-                        errors.push(`слот ${slotId}`);
-                    }
-                } catch (e) {
-                    console.error(`[KV Cache Manager] Ошибка при загрузке слота ${slotId}:`, e);
-                    errors.push(`слот ${slotId}: ${e.message}`);
-                }
-            }
-            
-            if (loadedCount > 0) {
-                if (errors.length > 0) {
-                    showToast('warning', `Загружено ${loadedCount} из ${filesToLoad.length} слотов. Ошибки: ${errors.join(', ')}`);
-                } else {
-                    showToast('success', `Загружено ${loadedCount} слотов`);
-                }
-                // Обновляем список слотов после загрузки
-                setTimeout(() => updateSlotsList(), 1000);
+        
+        // Обработчик сворачивания/разворачивания группы
+        groupElement.find('.kv-cache-load-file-group-header').on('click', function(e) {
+            // Не сворачиваем при клике на файл
+            if ($(e.target).closest('.kv-cache-load-file-item').length) return;
+            // Не сворачиваем при клике на иконку выбора группы
+            if ($(e.target).hasClass('kv-cache-load-file-group-toggle')) {
+                groupElement.toggleClass('collapsed');
             } else {
-                showToast('error', `Не удалось загрузить кеш. Ошибки: ${errors.join(', ')}`);
+                // При клике на заголовок выбираем группу
+                $(".kv-cache-load-file-item").removeClass('selected');
+                $(".kv-cache-load-file-group").removeClass('selected');
+                groupElement.addClass('selected');
+                groupElement.find('.kv-cache-load-file-item').first().addClass('selected');
+                
+                loadModalData.selectedGroup = group;
+                $("#kv-cache-load-confirm-button").prop('disabled', false);
+                $("#kv-cache-load-selected-info").html(`
+                    <strong>Выбрано:</strong> ${dateTime} ${userName} (${slotsCount} слот${slotsCount !== 1 ? 'ов' : ''})
+                `);
             }
-            return;
+        });
+        
+        filesList.append(groupElement);
+    }
+}
+
+// Загрузка выбранного кеша
+async function loadSelectedCache() {
+    const selectedGroup = loadModalData.selectedGroup;
+    
+    if (!selectedGroup) {
+        showToast('error', 'Файл не выбран');
+        return;
+    }
+    
+    // Парсим slotId из имён файлов
+    const filesToLoad = [];
+    for (const filename of selectedGroup.files) {
+        const parsed = parseSaveFilename(filename);
+        if (parsed) {
+            filesToLoad.push({
+                filename: filename,
+                slotId: parsed.slotId
+            });
+        } else {
+            console.warn('[KV Cache Manager] Не удалось распарсить имя файла для загрузки:', filename);
         }
     }
     
-    showToast('error', 'Неверный выбор');
+    if (filesToLoad.length === 0) {
+        showToast('warning', 'Не найдено файлов для загрузки');
+        return;
+    }
+    
+    // Закрываем модалку
+    closeLoadModal();
+    
+    showToast('info', 'Начинаю загрузку кеша...');
+    
+    console.debug(`[KV Cache Manager] Начинаю загрузку ${filesToLoad.length} файлов:`, filesToLoad);
+    
+    let loadedCount = 0;
+    let errors = [];
+    
+    for (const { filename, slotId } of filesToLoad) {
+        try {
+            if (await loadSlotCache(slotId, filename)) {
+                loadedCount++;
+                console.debug(`[KV Cache Manager] Загружен кеш для слота ${slotId} из файла ${filename}`);
+            } else {
+                errors.push(`слот ${slotId}`);
+            }
+        } catch (e) {
+            console.error(`[KV Cache Manager] Ошибка при загрузке слота ${slotId}:`, e);
+            errors.push(`слот ${slotId}: ${e.message}`);
+        }
+    }
+    
+    if (loadedCount > 0) {
+        if (errors.length > 0) {
+            showToast('warning', `Загружено ${loadedCount} из ${filesToLoad.length} слотов. Ошибки: ${errors.join(', ')}`);
+        } else {
+            showToast('success', `Загружено ${loadedCount} слотов`);
+        }
+        // Обновляем список слотов после загрузки
+        setTimeout(() => updateSlotsList(), 1000);
+    } else {
+        showToast('error', `Не удалось загрузить кеш. Ошибки: ${errors.join(', ')}`);
+    }
 }
 
 async function onLoadButtonClick() {
-    await showLoadModalForChat();
+    await openLoadModal();
 }
 
 // Функция вызывается при загрузке расширения
@@ -802,4 +957,47 @@ jQuery(async () => {
     $("#kv-cache-save-button").on("click", onSaveButtonClick);
     $("#kv-cache-load-button").on("click", onLoadButtonClick);
     $("#kv-cache-save-now-button").on("click", onSaveNowButtonClick);
+    
+    // Обработчики для модалки загрузки (используем делегирование для динамических элементов)
+    $(document).on("click", "#kv-cache-load-modal-close", closeLoadModal);
+    $(document).on("click", "#kv-cache-load-cancel-button", closeLoadModal);
+    $(document).on("click", "#kv-cache-load-confirm-button", loadSelectedCache);
+    
+    // Обработчик для текущего чата (делегирование)
+    $(document).on("click", ".kv-cache-load-chat-item-current", function() {
+        selectLoadModalChat('current');
+    });
+    
+    // Обработчик поиска
+    $(document).on("input", "#kv-cache-load-search-input", function() {
+        loadModalData.searchQuery = $(this).val();
+        renderLoadModalChats();
+        const activeChat = $(".kv-cache-load-chat-item.active");
+        const activeCurrentChat = $(".kv-cache-load-chat-item-current.active");
+        
+        let currentChatId = null;
+        if (activeChat.length) {
+            currentChatId = activeChat.data('chat-id');
+        } else if (activeCurrentChat.length) {
+            currentChatId = loadModalData.currentChatId;
+        }
+        
+        if (currentChatId) {
+            renderLoadModalFiles(currentChatId);
+        }
+    });
+    
+    // Закрытие модалки по клику вне её области
+    $(document).on("click", "#kv-cache-load-modal", function(e) {
+        if ($(e.target).is("#kv-cache-load-modal")) {
+            closeLoadModal();
+        }
+    });
+    
+    // Закрытие модалки по Escape
+    $(document).on("keydown", function(e) {
+        if (e.key === "Escape" && $("#kv-cache-load-modal").is(":visible")) {
+            closeLoadModal();
+        }
+    });
 });

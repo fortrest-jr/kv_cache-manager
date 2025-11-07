@@ -32,13 +32,12 @@ async function loadSettings() {
     }
 
     // Обновляем настройки в UI
-    const settings = extensionSettings;
-    $("#kv-cache-enabled").prop("checked", settings.enabled).trigger("input");
-    $("#kv-cache-save-interval").val(settings.saveInterval).trigger("input");
-    $("#kv-cache-max-files").val(settings.maxFiles).trigger("input");
-    $("#kv-cache-auto-load").prop("checked", settings.autoLoadOnChatSwitch).trigger("input");
-    $("#kv-cache-show-notifications").prop("checked", settings.showNotifications).trigger("input");
-    $("#kv-cache-validate").prop("checked", settings.checkSlotUsage).trigger("input");
+    $("#kv-cache-enabled").prop("checked", extensionSettings.enabled).trigger("input");
+    $("#kv-cache-save-interval").val(extensionSettings.saveInterval).trigger("input");
+    $("#kv-cache-max-files").val(extensionSettings.maxFiles).trigger("input");
+    $("#kv-cache-auto-load").prop("checked", extensionSettings.autoLoadOnChatSwitch).trigger("input");
+    $("#kv-cache-show-notifications").prop("checked", extensionSettings.showNotifications).trigger("input");
+    $("#kv-cache-validate").prop("checked", extensionSettings.checkSlotUsage).trigger("input");
     
 }
 
@@ -49,8 +48,7 @@ function showToast(type, message, title = 'KV Cache Manager') {
         return;
     }
 
-    const settings = extensionSettings || defaultSettings;
-    if (!settings.showNotifications) {
+    if (!extensionSettings.showNotifications) {
         return;
     }
 
@@ -212,9 +210,6 @@ function slotUsed(slotInfo) {
 
 // Получение всех активных слотов с проверкой валидности
 async function getActiveSlots() {
-    const settings = extensionSettings || defaultSettings;
-    
-    // Получаем информацию о всех слотах через /slots
     const slotsData = await getAllSlotsInfo();
     
     if (!slotsData) {
@@ -234,7 +229,7 @@ async function getActiveSlots() {
     }
     
     // Если проверка отключена, возвращаем все слоты
-    if (!settings.checkSlotUsage) {
+    if (!extensionSettings.checkSlotUsage) {
         return Array.from({ length: slotsArray.length }, (_, i) => i);
     }
     
@@ -369,19 +364,17 @@ async function loadSlotCache(slotId, filename) {
 
 // Получение списка сохранений из настроек
 function getSavesList() {
-    const settings = extensionSettings || defaultSettings;
-    return settings.saves || [];
+    return extensionSettings.saves || [];
 }
 
 // Добавление сохранения в список
 function addSaveToList(timestamp, chatName, userName, files) {
-    const settings = extensionSettings || defaultSettings;
-    if (!settings.saves) {
-        settings.saves = [];
+    if (!extensionSettings.saves) {
+        extensionSettings.saves = [];
     }
     
     // Добавляем сохранение в начало списка
-    settings.saves.unshift({
+    extensionSettings.saves.unshift({
         timestamp: timestamp,
         chatName: chatName,
         userName: userName || null,
@@ -399,12 +392,11 @@ function addSaveToList(timestamp, chatName, userName, files) {
 
 // Удаление сохранения из списка
 function removeSaveFromList(timestamp, chatName) {
-    const settings = extensionSettings || defaultSettings;
-    if (!settings.saves) {
+    if (!extensionSettings.saves) {
         return;
     }
     
-    settings.saves = settings.saves.filter(save => 
+    extensionSettings.saves = extensionSettings.saves.filter(save => 
         !(save.timestamp === timestamp && save.chatName === chatName)
     );
     

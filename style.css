@@ -528,23 +528,45 @@
     }
     
     /* Адаптивность для модалки подтверждения автозагрузки */
+    #kv-cache-auto-load-confirm-modal {
+        padding: 20px;
+        align-items: flex-start;
+        padding-top: 10vh;
+    }
+    
     #kv-cache-auto-load-confirm-modal .dialogue_popup_content {
-        width: 100vw;
-        max-width: 100vw;
-        max-height: 100vh;
+        width: calc(100vw - 40px);
+        max-width: calc(100vw - 40px);
+        max-height: calc(90vh - 20px);
         margin: 0;
-        border-radius: 0;
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    #kv-cache-auto-load-confirm-modal .dialogue_popup_header {
+        padding: 15px 20px;
+        border-bottom: 1px solid var(--SmartThemeBorderColor);
     }
     
     #kv-cache-auto-load-confirm-modal .dialogue_popup_body {
-        padding: 15px;
+        padding: 20px;
         min-height: auto;
+        flex: 1;
+        overflow-y: auto;
     }
     
     #kv-cache-auto-load-confirm-modal .dialogue_popup_footer {
         flex-direction: column;
         gap: 12px;
         align-items: stretch;
+        padding: 15px 20px;
+        margin-top: 0;
+        border-top: 1px solid var(--SmartThemeBorderColor);
+    }
+    
+    #kv-cache-auto-load-confirm-modal .dialogue_popup_footer > div:first-child {
+        display: none;
     }
     
     #kv-cache-auto-load-confirm-modal .dialogue_popup_footer > div:last-child {
@@ -562,8 +584,10 @@
     }
     
     #kv-cache-auto-load-confirm-info {
-        padding: 15px 0 !important;
-        font-size: 0.95em;
+        padding: 0 !important;
+        font-size: 1em;
+        line-height: 1.6;
+        word-wrap: break-word;
     }
 }
 

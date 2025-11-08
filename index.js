@@ -161,11 +161,15 @@ function incrementMessageCounter(characterName) {
                             messageCounters[chatId][characterName] = 0;
                             updateNextSaveIndicator();
                         }
-                    }).catch(() => {});
+                    }).catch((e) => {
+                        console.error(`[KV Cache Manager] Ошибка при сохранении кеша для персонажа ${characterName}:`, e);
+                    });
                 } else {
                     console.warn(`[KV Cache Manager] Не удалось найти слот для сохранения персонажа ${characterName}`);
                 }
-            }).catch(() => {});
+            }).catch((e) => {
+                console.error(`[KV Cache Manager] Ошибка при получении активных слотов для персонажа ${characterName}:`, e);
+            });
             return; // Выходим, так как сохранение будет выполнено асинхронно
         }
         
@@ -177,8 +181,9 @@ function incrementMessageCounter(characterName) {
                     messageCounters[chatId][characterName] = 0;
                     updateNextSaveIndicator();
                 }
-            }).catch(() => {
+            }).catch((e) => {
                 // При ошибке не сбрасываем счетчик, чтобы попробовать сохранить снова
+                console.error(`[KV Cache Manager] Ошибка при автосохранении кеша для персонажа ${characterName}:`, e);
             });
         } else {
             console.warn(`[KV Cache Manager] Не удалось найти слот для сохранения персонажа ${characterName}`);
@@ -306,7 +311,7 @@ function onGroupChatModeChange(event) {
 // Получение URL llama.cpp сервера
 function getLlamaUrl() {
     const provided_url = textgenerationwebui_settings.server_urls[textgen_types.LLAMACPP]
-    console.debug('Lllamacpp server URL: ' + provided_url);
+    console.debug('LlamaCpp server URL: ' + provided_url);
     return provided_url;
 }
 
@@ -491,7 +496,8 @@ async function getAllSlotsInfo() {
     } catch (e) {
         if (e.name !== 'AbortError') {
             console.debug('[KV Cache Manager] Ошибка получения информации о слотах:', e);
-            showToast('error', 'Ошибка получения информации о слотах:', e);
+            const errorMessage = e.message || String(e);
+            showToast('error', `Ошибка получения информации о слотах: ${errorMessage}`);
         }
     }
     
@@ -616,7 +622,9 @@ async function assignCharactersToSlots() {
             saveSlotCache(i, filename).then((success) => {
                 if (success) {
                     console.debug(`[KV Cache Manager] Сохранен кеш персонажа ${currentCharacter} из другого чата перед очисткой слота`);
-                    rotateCharacterFiles(currentCharacter).catch(() => {});
+                    rotateCharacterFiles(currentCharacter).catch((e) => {
+                        console.error(`[KV Cache Manager] Ошибка при ротации файлов для персонажа ${currentCharacter}:`, e);
+                    });
                 }
             }).catch((e) => {
                 console.error(`[KV Cache Manager] Ошибка при сохранении кеша персонажа ${currentCharacter}:`, e);
@@ -748,7 +756,9 @@ function acquireSlot(characterName) {
                 if (success) {
                     console.debug(`[KV Cache Manager] Сохранен кеш вытесняемого персонажа ${evictedCharacter} в файл ${filename}`);
                     // Выполняем ротацию файлов для вытесняемого персонажа
-                    rotateCharacterFiles(evictedCharacter).catch(() => {});
+                    rotateCharacterFiles(evictedCharacter).catch((e) => {
+                        console.error(`[KV Cache Manager] Ошибка при ротации файлов для вытесняемого персонажа ${evictedCharacter}:`, e);
+                    });
                 }
             }).catch((e) => {
                 console.error(`[KV Cache Manager] Ошибка при сохранении кеша вытесняемого персонажа ${evictedCharacter}:`, e);
@@ -775,7 +785,7 @@ function releaseSlot(slotIndex) {
     }
     
     const characterName = extensionSettings.slots[slotIndex];
-    delete extensionSettings.slots[slotIndex];
+    extensionSettings.slots[slotIndex] = undefined;
     extensionSettings.slotsUsage[slotIndex] = 0;
     
     console.debug(`[KV Cache Manager] Освобожден слот ${slotIndex} (персонаж: ${characterName})`);
@@ -1286,9 +1296,14 @@ async function onSaveButtonClick() {
 async function onSaveNowButtonClick() {
     const success = await saveCache(false); // Не запрашиваем имя пользователя
     if (success) {
-        // Сбрасываем счётчик текущего чата после успешного сохранения
+        // Сбрасываем счётчики всех персонажей текущего чата после успешного сохранения
         const chatId = getNormalizedChatId();
-        messageCounters[chatId] = 0;
+        if (messageCounters[chatId]) {
+            // Сбрасываем счетчики для всех персонажей в этом чате
+            for (const characterName in messageCounters[chatId]) {
+                messageCounters[chatId][characterName] = 0;
+            }
+        }
         updateNextSaveIndicator();
     }
 }
@@ -2300,6 +2315,9 @@ jQuery(async () => {
                 // Персонаж уже прикреплен к слоту
                 currentSlot = existingSlotIndex;
                 // Увеличиваем счетчик использования
+                if (!extensionSettings.slotsUsage) {
+                    extensionSettings.slotsUsage = [];
+                }
                 extensionSettings.slotsUsage[existingSlotIndex] = (extensionSettings.slotsUsage[existingSlotIndex] || 0) + 1;
                 saveSettingsDebounced();
                 updateSlotsAvailability();

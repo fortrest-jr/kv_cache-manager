@@ -658,7 +658,13 @@ async function onSaveButtonClick() {
 }
 
 async function onSaveNowButtonClick() {
-    await saveCache(false); // Не запрашиваем имя пользователя
+    const success = await saveCache(false); // Не запрашиваем имя пользователя
+    if (success) {
+        // Сбрасываем счётчик текущего чата после успешного сохранения
+        const chatId = getNormalizedChatId();
+        messageCounters[chatId] = 0;
+        updateNextSaveIndicator();
+    }
 }
 
 let csrfTokenCache = null;

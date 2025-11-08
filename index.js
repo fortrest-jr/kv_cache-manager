@@ -14,10 +14,11 @@ const defaultSettings = {
     enabled: true,
     saveInterval: 5,
     autoLoadOnChatSwitch: true,
-    autoLoadAskConfirmation: true,
+    autoLoadAskConfirmation: false,
     maxFiles: 10,
     showNotifications: true,
-    checkSlotUsage: true
+    checkSlotUsage: true,
+    clearSlotsOnChatSwitch: true
 };
 
 const extensionSettings = extension_settings[extensionName] ||= {};
@@ -115,6 +116,7 @@ async function loadSettings() {
     $("#kv-cache-auto-load-ask").prop("checked", extensionSettings.autoLoadAskConfirmation).trigger("input");
     $("#kv-cache-show-notifications").prop("checked", extensionSettings.showNotifications).trigger("input");
     $("#kv-cache-validate").prop("checked", extensionSettings.checkSlotUsage).trigger("input");
+    $("#kv-cache-clear-slots").prop("checked", extensionSettings.clearSlotsOnChatSwitch).trigger("input");
     
     // Обновляем индикатор следующего сохранения
     updateNextSaveIndicator();
@@ -191,6 +193,12 @@ function onShowNotificationsChange(event) {
 function onValidateChange(event) {
     const value = Boolean($(event.target).prop("checked"));
     extensionSettings.checkSlotUsage = value;
+    saveSettingsDebounced();
+}
+
+function onClearSlotsChange(event) {
+    const value = Boolean($(event.target).prop("checked"));
+    extensionSettings.clearSlotsOnChatSwitch = value;
     saveSettingsDebounced();
 }
 
@@ -471,6 +479,110 @@ async function loadSlotCache(slotId, filename) {
         } else {
             console.error(`[KV Cache Manager] Ошибка загрузки кеша слота ${slotId}:`, e);
         }
+        return false;
+    }
+}
+
+// Очистка кеша для слота
+async function clearSlotCache(slotId) {
+    const llamaUrl = getLlamaUrl();
+    const url = `${llamaUrl}slots/${slotId}?action=erase`;
+    
+    console.debug(`[KV Cache Manager] Очистка кеша слота ${slotId}`);
+    
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 секунд таймаут
+        
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`[KV Cache Manager] Ошибка очистки слота ${slotId}: ${response.status} ${errorText}`);
+            return false;
+        }
+        
+        console.debug(`[KV Cache Manager] Кеш успешно очищен для слота ${slotId}`);
+        return true;
+    } catch (e) {
+        if (e.name === 'AbortError') {
+            console.error(`[KV Cache Manager] Таймаут при очистке кеша слота ${slotId}`);
+        } else {
+            console.error(`[KV Cache Manager] Ошибка очистки слота ${slotId}:`, e);
+        }
+        return false;
+    }
+}
+
+// Очистка всех слотов
+async function clearAllSlots() {
+    const llamaUrl = getLlamaUrl();
+    
+    try {
+        // Получаем информацию о всех слотах
+        const slotsData = await getAllSlotsInfo();
+        
+        if (!slotsData) {
+            console.debug('[KV Cache Manager] Не удалось получить информацию о слотах для очистки');
+            return false;
+        }
+        
+        // Определяем общее количество слотов
+        const totalSlots = getSlotsCountFromData(slotsData);
+        
+        if (totalSlots === 0) {
+            console.debug('[KV Cache Manager] Нет слотов для очистки');
+            return true;
+        }
+        
+        console.debug(`[KV Cache Manager] Начинаю очистку ${totalSlots} слотов`);
+        
+        let clearedCount = 0;
+        let errors = [];
+        
+        // Очищаем все слоты (от 0 до totalSlots - 1)
+        for (let slotId = 0; slotId < totalSlots; slotId++) {
+            try {
+                if (await clearSlotCache(slotId)) {
+                    clearedCount++;
+                } else {
+                    errors.push(`слот ${slotId}`);
+                }
+            } catch (e) {
+                console.error(`[KV Cache Manager] Ошибка при очистке слота ${slotId}:`, e);
+                errors.push(`слот ${slotId}: ${e.message}`);
+            }
+        }
+        
+        if (clearedCount > 0) {
+            if (errors.length > 0) {
+                console.warn(`[KV Cache Manager] Очищено ${clearedCount} из ${totalSlots} слотов. Ошибки: ${errors.join(', ')}`);
+                showToast('warning', `Очищено ${clearedCount} из ${totalSlots} слотов. Ошибки: ${errors.join(', ')}`, 'Очистка кеша');
+            } else {
+                console.debug(`[KV Cache Manager] Успешно очищено ${clearedCount} слотов`);
+                showToast('success', `Успешно очищено ${clearedCount} слотов`, 'Очистка кеша');
+            }
+            
+            // Обновляем список слотов после очистки
+            setTimeout(() => updateSlotsList(), 1000);
+            
+            return true;
+        } else {
+            console.error(`[KV Cache Manager] Не удалось очистить слоты. Ошибки: ${errors.join(', ')}`);
+            showToast('error', `Не удалось очистить слоты. Ошибки: ${errors.join(', ')}`, 'Очистка кеша');
+            return false;
+        }
+    } catch (e) {
+        console.error('[KV Cache Manager] Ошибка при очистке всех слотов:', e);
+        showToast('error', `Ошибка при очистке слотов: ${e.message}`, 'Очистка кеша');
         return false;
     }
 }
@@ -1133,7 +1245,10 @@ async function loadFileGroup(group, chatId) {
     
     if (loadedCount > 0) {
         // Запоминаем чат при любой успешной загрузке (автоматической или ручной)
-        lastLoadedChatId = chatId;
+        // Но не запоминаем, если включена очистка слотов при переключении чата
+        if (!extensionSettings.clearSlotsOnChatSwitch) {
+            lastLoadedChatId = chatId;
+        }
         
         if (errors.length > 0) {
             showToast('warning', `Загружено ${loadedCount} из ${filesToLoad.length} слотов. Ошибки: ${errors.join(', ')}`, 'Автозагрузка');
@@ -1190,10 +1305,6 @@ async function confirmAutoLoad() {
 
 // Автозагрузка последнего файла при переключении чата
 async function tryAutoLoadOnChatSwitch(chatId) {
-    // Проверяем, включена ли автозагрузка
-    if (!extensionSettings.autoLoadOnChatSwitch) {
-        return;
-    }
     
     // Не предлагаем автозагрузку для чата "unknown"
     if (chatId === 'unknown' || !chatId) {
@@ -1345,9 +1456,22 @@ jQuery(async () => {
     // Подписка на событие переключения чата для автозагрузки
     eventSource.on(event_types.CHAT_CHANGED, async () => {
         const currentChatId = getNormalizedChatId();
-        setTimeout(async () => {
-            await tryAutoLoadOnChatSwitch(currentChatId);
-        }, 500);
+        
+        // Если включена очистка слотов при переключении чата
+        if (extensionSettings.clearSlotsOnChatSwitch) {
+            // Очищаем все слоты перед переключением
+            await clearAllSlots();
+            // Не запоминаем последний загруженный чат, так как кеш будет очищен
+            lastLoadedChatId = null;
+        }
+        
+        // Проверяем, включена ли автозагрузка
+        if (extensionSettings.autoLoadOnChatSwitch) {
+            setTimeout(async () => {
+                await tryAutoLoadOnChatSwitch(currentChatId);
+            }, 500);
+        }
+        
     });
     
     // При переключении чата счетчик не сбрасывается - каждый чат имеет свой независимый счетчик
@@ -1361,6 +1485,7 @@ jQuery(async () => {
     $("#kv-cache-auto-load").on("input", onAutoLoadChange);
     $("#kv-cache-show-notifications").on("input", onShowNotificationsChange);
     $("#kv-cache-validate").on("input", onValidateChange);
+    $("#kv-cache-clear-slots").on("input", onClearSlotsChange);
     
     $("#kv-cache-save-button").on("click", onSaveButtonClick);
     $("#kv-cache-load-button").on("click", onLoadButtonClick);

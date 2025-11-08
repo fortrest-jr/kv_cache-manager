@@ -1754,15 +1754,24 @@ function renderLoadModalFiles(chatId) {
                             <i class="fa-solid fa-calendar"></i>
                             ${dateTime}${tagLabel}
                         </div>
-                        <div class="kv-cache-load-file-item-meta">
-                            <input type="radio" name="character-${characterName}" value="${file.timestamp}" />
-                        </div>
                     </div>
                 </div>
             `);
             
+            // Проверяем, является ли это сохранение выбранным
+            const isSelected = loadModalData.selectedCharacters[characterName] === file.timestamp;
+            if (isSelected) {
+                timestampItem.addClass('selected');
+            }
+            
             timestampItem.on('click', function(e) {
                 e.stopPropagation();
+                
+                // Убираем выделение с других сохранений этого персонажа
+                $(`.kv-cache-load-file-item[data-character-name="${characterName}"]`).removeClass('selected');
+                
+                // Выделяем выбранное сохранение
+                timestampItem.addClass('selected');
                 
                 // Выбираем этот timestamp для персонажа
                 const selectedTimestamp = file.timestamp;
@@ -1918,30 +1927,60 @@ async function loadFileGroup(group, chatId) {
         return false;
     }
     
-    // Парсим slotId из имён файлов
-    const filesToLoad = [];
-    for (const file of group.files) {
-        const filename = file.name;
-        if (file.slotId !== undefined) {
-            filesToLoad.push({
-                filename: filename,
-                slotId: file.slotId
-            });
-        } else {
-            // Fallback: парсим из имени файла
-            const parsed = parseSaveFilename(filename);
-            if (parsed) {
-                filesToLoad.push({
-                    filename: filename,
-                    slotId: parsed.slotId
-                });
-            } else {
-                console.warn('[KV Cache Manager] Не удалось распарсить имя файла для загрузки:', filename);
-            }
+    // Инициализируем слоты, если режим групповых чатов включен
+    if (extensionSettings.groupChatMode) {
+        if (!extensionSettings.slots || extensionSettings.slots.length === 0) {
+            await initializeSlots();
         }
     }
     
+    // Подготавливаем файлы для загрузки
+    const filesToLoad = [];
+    for (const file of group.files) {
+        const filename = file.name;
+        const parsed = parseSaveFilename(filename);
+        
+        if (!parsed) {
+            console.warn('[KV Cache Manager] Не удалось распарсить имя файла для загрузки:', filename);
+            continue;
+        }
+        
+        // Файл должен иметь characterName
+        if (!parsed.characterName) {
+            console.warn(`[KV Cache Manager] Файл ${filename} не содержит имя персонажа, пропускаем`);
+            continue;
+        }
+        
+        let slotIndex = null;
+        
+        if (extensionSettings.groupChatMode) {
+            // В режиме групповых чатов получаем слот для персонажа
+            slotIndex = acquireSlot(parsed.characterName);
+            
+            if (slotIndex === null) {
+                console.warn(`[KV Cache Manager] Не удалось получить слот для персонажа ${parsed.characterName}`);
+                continue;
+            }
+        } else {
+            // В обычном режиме используем первый активный слот
+            const activeSlots = await getActiveSlots();
+            if (activeSlots.length > 0) {
+                slotIndex = activeSlots[0];
+            } else {
+                console.warn(`[KV Cache Manager] Нет активных слотов для загрузки файла ${filename}`);
+                continue;
+            }
+        }
+        
+        filesToLoad.push({
+            filename: filename,
+            slotId: slotIndex,
+            characterName: parsed.characterName
+        });
+    }
+    
     if (filesToLoad.length === 0) {
+        console.warn('[KV Cache Manager] Нет файлов для загрузки после обработки');
         return false;
     }
     
@@ -1951,6 +1990,11 @@ async function loadFileGroup(group, chatId) {
     let errors = [];
     
     for (const { filename, slotId } of filesToLoad) {
+        if (slotId === null || slotId === undefined) {
+            errors.push(`слот null (файл: ${filename})`);
+            continue;
+        }
+        
         try {
             if (await loadSlotCache(slotId, filename)) {
                 loadedCount++;

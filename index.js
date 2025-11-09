@@ -1802,11 +1802,20 @@ function renderLoadModalFiles(chatId) {
     const isCurrentChat = chatId === loadModalData.currentChatId;
     if (isCurrentChat && extensionSettings.groupChatMode && currentSlots) {
         const slots = currentSlots;
-        const slotsCharacters = new Set(slots.map(slot => slot?.characterName).filter(name => name && typeof name === 'string'));
+        // Создаем Set нормализованных имен из слотов для корректного сравнения
+        const slotsCharacters = new Set(
+            slots
+                .map(slot => slot?.characterName)
+                .filter(name => name && typeof name === 'string')
+                .map(name => normalizeCharacterName(name))
+        );
         
         filteredCharacters.sort((a, b) => {
-            const aInSlots = slotsCharacters.has(a);
-            const bInSlots = slotsCharacters.has(b);
+            // Нормализуем имена для сравнения (имена из файлов уже нормализованы, но на всякий случай)
+            const normalizedA = normalizeCharacterName(a);
+            const normalizedB = normalizeCharacterName(b);
+            const aInSlots = slotsCharacters.has(normalizedA);
+            const bInSlots = slotsCharacters.has(normalizedB);
             
             // Персонажи в слотах идут первыми
             if (aInSlots && !bInSlots) return -1;

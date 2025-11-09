@@ -2635,44 +2635,40 @@ jQuery(async () => {
                 // Если usage > 0, значит персонаж уже был в слоте
                 const isNewSlot = currentSlots[currentSlot]?.usage === 0;
                 
-                currentSlots[currentSlot].usage++;
-                showToast('info', `Счетчик использования для ${characterName} увеличен до: ${currentSlots[currentSlot].usage}`, 'Генерация');
-                console.debug(`[KV Cache Manager] Счетчик использования для персонажа ${characterName} в слоте ${currentSlot} увеличен до: ${currentSlots[currentSlot].usage}`);
-                
-                if (!isNewSlot) {
-                    return;
-                }
                 // Новый слот - загружаем кеш, если есть
-
-                try {
-                    const cacheInfo = await getLastCacheForCharacter(characterName, true); // Только из текущего чата
-                    
-                    if (cacheInfo) {
-                        const loaded = await loadSlotCache(currentSlot, cacheInfo.filename);
+                if (isNewSlot) {
+                    try {
+                        const cacheInfo = await getLastCacheForCharacter(characterName, true); // Только из текущего чата
                         
-                        if (loaded) {
-                            // Форматируем дату-время из timestamp для тоста
-                            const parsed = parseSaveFilename(cacheInfo.filename);
-                            if (parsed && parsed.timestamp) {
-                                const dateTimeStr = formatTimestampToDate(parsed.timestamp);
-                                showToast('success', `Кеш для ${characterName} загружен (${dateTimeStr})`, 'Генерация');
+                        if (cacheInfo) {
+                            const loaded = await loadSlotCache(currentSlot, cacheInfo.filename);
+                            
+                            if (loaded) {
+                                // Форматируем дату-время из timestamp для тоста
+                                const parsed = parseSaveFilename(cacheInfo.filename);
+                                if (parsed && parsed.timestamp) {
+                                    const dateTimeStr = formatTimestampToDate(parsed.timestamp);
+                                    showToast('success', `Кеш для ${characterName} загружен (${dateTimeStr})`, 'Генерация');
+                                } else {
+                                    showToast('success', `Кеш для ${characterName} загружен`, 'Генерация');
+                                }
+                                console.debug(`[KV Cache Manager] Кеш персонажа ${characterName} успешно загружен в слот ${currentSlot} при генерации`);
                             } else {
-                                showToast('success', `Кеш для ${characterName} загружен`, 'Генерация');
+                                showToast('warning', `Не удалось загрузить кеш для ${characterName}`, 'Генерация');
+                                console.warn(`[KV Cache Manager] Не удалось загрузить кеш для персонажа ${characterName} в слот ${currentSlot}`);
                             }
-                            console.debug(`[KV Cache Manager] Кеш персонажа ${characterName} успешно загружен в слот ${currentSlot} при генерации`);
-                            // loadSlotCache сбросил счетчик в 0, поэтому после загрузки он будет 0
                         } else {
-                            showToast('warning', `Не удалось загрузить кеш для ${characterName}`, 'Генерация');
-                            console.warn(`[KV Cache Manager] Не удалось загрузить кеш для персонажа ${characterName} в слот ${currentSlot}`);
+                            console.debug(`[KV Cache Manager] Кеш для персонажа ${characterName} не найден, генерация продолжится с пустым кешем`);
                         }
-                    } else {
-                        console.debug(`[KV Cache Manager] Кеш для персонажа ${characterName} не найден, генерация продолжится с пустым кешем`);
+                    } catch (e) {
+                        console.error(`[KV Cache Manager] Ошибка при загрузке кеша для персонажа ${characterName}:`, e);
+                        showToast('error', `Ошибка при загрузке кеша для ${characterName}: ${e.message}`, 'Генерация');
+                        // Не прерываем генерацию при ошибке загрузки кеша
                     }
-                } catch (e) {
-                    console.error(`[KV Cache Manager] Ошибка при загрузке кеша для персонажа ${characterName}:`, e);
-                    showToast('error', `Ошибка при загрузке кеша для ${characterName}: ${e.message}`, 'Генерация');
-                    // Не прерываем генерацию при ошибке загрузки кеша
                 }
+                
+                currentSlots[currentSlot].usage++;
+                console.debug(`[KV Cache Manager] Счетчик использования для персонажа ${characterName} в слоте ${currentSlot} увеличен до: ${currentSlots[currentSlot].usage}`);
             }
             
             // Логируем завершение интерсептора для отладки

@@ -1198,27 +1198,25 @@ function groupFilesByChat(files) {
     const parsedFiles = parseFilesList(files);
     
     for (const file of parsedFiles) {
-        const { parsed, name: filename } = file;
-        
-        if (!parsed) {
+        if (!file.parsed) {
             // Если не удалось распарсить, пропускаем этот файл
-            console.warn('[KV Cache Manager] Не удалось распарсить имя файла:', filename);
+            console.warn('[KV Cache Manager] Не удалось распарсить имя файла:', file.name);
             continue;
         }
         
-        const chatId = parsed.chatId;
+        const chatId = file.parsed.chatId;
         if (!chats[chatId]) {
             chats[chatId] = [];
         }
         
         // Ищем существующую группу с таким timestamp в этом чате
-        let group = chats[chatId].find(g => g.timestamp === parsed.timestamp);
+        let group = chats[chatId].find(g => g.timestamp === file.parsed.timestamp);
         if (!group) {
             group = {
                 chatId: chatId,
-                timestamp: parsed.timestamp,
-                tag: parsed.tag || null,
-                characterName: parsed.characterName || null,
+                timestamp: file.parsed.timestamp,
+                tag: file.parsed.tag || null,
+                characterName: file.parsed.characterName || null,
                 files: []
             };
             chats[chatId].push(group);
@@ -1226,7 +1224,7 @@ function groupFilesByChat(files) {
         
         // Сохраняем объект файла с именем и размером
         group.files.push({
-            name: filename,
+            name: file.name,
             size: file.size || 0
         });
     }
@@ -1477,108 +1475,86 @@ async function deleteFile(filename) {
     }
 }
 
+// Общая функция ротации файлов
+// @param {Function} filterFn - функция фильтрации файлов: (file) => boolean
+// @param {string} description - описание для логов и уведомлений (например, "для персонажа CharacterName" или "для чата")
+// @param {string} context - контекст для логов (например, "персонажа CharacterName" или "чата")
+async function rotateFiles(filterFn, description, context) {
+    const chatId = getNormalizedChatId();
+    const maxFiles = extensionSettings.maxFiles;
+    
+    try {
+        // Получаем список всех файлов
+        const filesList = await getFilesList();
+        
+        // Парсим файлы один раз и фильтруем
+        const filteredFiles = parseFilesList(filesList).filter(filterFn);
+        
+        console.debug(`[KV Cache Manager] Найдено ${filteredFiles.length} автосохранений ${description} (лимит: ${maxFiles})`);
+        
+        // Сортируем по timestamp (от новых к старым)
+        sortByTimestamp(filteredFiles);
+        
+        if (filteredFiles.length > maxFiles) {
+            const filesToDelete = filteredFiles.slice(maxFiles);
+            console.debug(`[KV Cache Manager] Удаление ${filesToDelete.length} старых автосохранений ${description}`);
+            
+            let deletedCount = 0;
+            for (const file of filesToDelete) {
+                const deleted = await deleteFile(file.name);
+                if (deleted) {
+                    deletedCount++;
+                    console.debug(`[KV Cache Manager] Удален файл: ${file.name}`);
+                }
+            }
+            
+            if (deletedCount > 0 && extensionSettings.showNotifications) {
+                showToast('warning', `Удалено ${deletedCount} старых автосохранений ${description}`, 'Ротация файлов');
+            }
+        } else {
+            console.debug(`[KV Cache Manager] Ротация не требуется ${context}: ${filteredFiles.length} файлов <= ${maxFiles}`);
+        }
+    } catch (e) {
+        console.error(`[KV Cache Manager] Ошибка при ротации файлов ${context}:`, e);
+    }
+}
+
 // Ротация файлов для конкретного персонажа
 async function rotateCharacterFiles(characterName) {
     if (!characterName) {
         return;
     }
     
+    const normalizedName = normalizeCharacterName(characterName);
     const chatId = getNormalizedChatId();
-    const maxFiles = extensionSettings.maxFiles;
     
-    try {
-        // Получаем список всех файлов
-        const filesList = await getFilesList();
-        
-        // Фильтруем только автосохранения для этого персонажа в текущем чате (без тега)
-        // Сравниваем нормализованные имена, так как в файлах хранятся нормализованные имена
-        const normalizedName = normalizeCharacterName(characterName);
-        // Парсим файлы один раз и фильтруем
-        const characterFiles = parseFilesList(filesList)
-            .filter(({ parsed }) => {
-                if (!parsed) return false;
-                const parsedNormalizedName = normalizeCharacterName(parsed.characterName || '');
-                return parsed.chatId === chatId && 
-                       parsedNormalizedName === normalizedName &&
-                       !parsed.tag; // Только автосохранения (без тега)
-            });
-        
-        console.debug(`[KV Cache Manager] Найдено ${characterFiles.length} автосохранений для персонажа ${characterName} в чате ${chatId} (лимит: ${maxFiles})`);
-        
-        // Сортируем по timestamp (от новых к старым)
-        sortFilesByTimestamp(characterFiles);
-        
-        if (characterFiles.length > maxFiles) {
-            const filesToDelete = characterFiles.slice(maxFiles);
-            console.debug(`[KV Cache Manager] Удаление ${filesToDelete.length} старых автосохранений для персонажа ${characterName}`);
-            
-            let deletedCount = 0;
-            for (const file of filesToDelete) {
-                const deleted = await deleteFile(file.name);
-                if (deleted) {
-                    deletedCount++;
-                    console.debug(`[KV Cache Manager] Удален файл: ${file.name}`);
-                }
-            }
-            
-            if (deletedCount > 0 && extensionSettings.showNotifications) {
-                showToast('warning', `Удалено ${deletedCount} старых автосохранений для ${characterName}`, 'Ротация файлов');
-            }
-        } else {
-            console.debug(`[KV Cache Manager] Ротация не требуется для ${characterName}: ${characterFiles.length} файлов <= ${maxFiles}`);
-        }
-    } catch (e) {
-        console.error(`[KV Cache Manager] Ошибка при ротации файлов для персонажа ${characterName}:`, e);
-    }
+    await rotateFiles(
+        (file) => {
+            if (!file.parsed) return false;
+            const parsedNormalizedName = normalizeCharacterName(file.parsed.characterName || '');
+            return file.parsed.chatId === chatId && 
+                   parsedNormalizedName === normalizedName &&
+                   !file.parsed.tag; // Только автосохранения (без тега)
+        },
+        `для персонажа ${characterName} в чате ${chatId}`,
+        `для ${characterName}`
+    );
 }
 
 // Ротация файлов: удаление старых автосохранений для текущего чата (старая функция, оставлена для обратной совместимости)
 async function rotateAutoSaveFiles() {
     const chatId = getNormalizedChatId();
-    const maxFiles = extensionSettings.maxFiles;
     
-    try {
-        // Получаем список всех файлов
-        const filesList = await getFilesList();
-        
-        // Фильтруем только автосохранения для текущего чата (без тега и без имени персонажа)
-        // Парсим файлы один раз и фильтруем
-        const autoSaveFiles = parseFilesList(filesList)
-            .filter(({ parsed }) => {
-                return parsed && 
-                       parsed.chatId === chatId && 
-                       !parsed.tag && 
-                       !parsed.characterName; // Только автосохранения (без тега и без имени персонажа)
-            });
-        
-        console.debug(`[KV Cache Manager] Найдено ${autoSaveFiles.length} автосохранений для чата ${chatId} (лимит: ${maxFiles})`);
-        
-        // Сортируем по timestamp (от новых к старым)
-        sortFilesByTimestamp(autoSaveFiles);
-        
-        if (autoSaveFiles.length > maxFiles) {
-            const filesToDelete = autoSaveFiles.slice(maxFiles);
-            console.debug(`[KV Cache Manager] Удаление ${filesToDelete.length} старых автосохранений для чата ${chatId}`);
-            
-            let deletedCount = 0;
-            for (const file of filesToDelete) {
-                const deleted = await deleteFile(file.name);
-                if (deleted) {
-                    deletedCount++;
-                    console.debug(`[KV Cache Manager] Удален файл: ${file.name}`);
-                }
-            }
-            
-            if (deletedCount > 0 && extensionSettings.showNotifications) {
-                showToast('warning', `Удалено ${deletedCount} старых автосохранений`, 'Ротация файлов');
-            }
-        } else {
-            console.debug(`[KV Cache Manager] Ротация не требуется: ${autoSaveFiles.length} файлов <= ${maxFiles}`);
-        }
-    } catch (e) {
-        showToast('error', `Ошибка при ротации файлов: ${e.message}`, 'Ротация файлов');
-        console.warn('[KV Cache Manager] Ошибка при ротации файлов:', e);
-    }
+    await rotateFiles(
+        (file) => {
+            return file.parsed && 
+                   file.parsed.chatId === chatId && 
+                   !file.parsed.tag && 
+                   !file.parsed.characterName; // Только автосохранения (без тега и без имени персонажа)
+        },
+        `для чата ${chatId}`,
+        ''
+    );
 }
 
 // Форматирование даты и времени из timestamp
@@ -1626,34 +1602,23 @@ function parseFilesList(files) {
     });
 }
 
-// Сортировка файлов по timestamp
-// @param {Array} files - массив файлов с полем parsed
-// @param {boolean} descending - true для сортировки от новых к старым (по умолчанию), false для обратного порядка
-// @returns {Array} - отсортированный массив файлов
-function sortFilesByTimestamp(files, descending = true) {
-    return files.sort((a, b) => {
-        const parsedA = a.parsed;
-        const parsedB = b.parsed;
-        if (!parsedA || !parsedB) return 0;
-        if (descending) {
-            return parsedB.timestamp.localeCompare(parsedA.timestamp);
-        } else {
-            return parsedA.timestamp.localeCompare(parsedB.timestamp);
-        }
-    });
-}
-
-// Сортировка объектов с timestamp по timestamp
-// @param {Array} items - массив объектов с полем timestamp
+// Сортировка по timestamp
+// Поддерживает как файлы с полем parsed.timestamp, так и объекты с полем timestamp
+// @param {Array} items - массив файлов (с parsed.timestamp) или объектов (с timestamp)
 // @param {boolean} descending - true для сортировки от новых к старым (по умолчанию), false для обратного порядка
 // @returns {Array} - отсортированный массив
 function sortByTimestamp(items, descending = true) {
     return items.sort((a, b) => {
-        if (!a.timestamp || !b.timestamp) return 0;
+        // Поддерживаем оба формата: parsed.timestamp (для файлов) и timestamp (для объектов)
+        const timestampA = a.parsed?.timestamp || a.timestamp;
+        const timestampB = b.parsed?.timestamp || b.timestamp;
+        
+        if (!timestampA || !timestampB) return 0;
+        
         if (descending) {
-            return b.timestamp.localeCompare(a.timestamp);
+            return timestampB.localeCompare(timestampA);
         } else {
-            return a.timestamp.localeCompare(b.timestamp);
+            return timestampA.localeCompare(timestampB);
         }
     });
 }
@@ -1677,14 +1642,12 @@ function groupFilesByChatAndCharacter(files) {
     const parsedFiles = parseFilesList(files);
     
     for (const file of parsedFiles) {
-        const { parsed, name: filename } = file;
-        
-        if (!parsed) {
+        if (!file.parsed) {
             continue;
         }
         
-        const chatId = parsed.chatId;
-        const characterName = parsed.characterName || 'Unknown';
+        const chatId = file.parsed.chatId;
+        const characterName = file.parsed.characterName || 'Unknown';
         
         if (!chats[chatId]) {
             chats[chatId] = {};
@@ -1695,9 +1658,9 @@ function groupFilesByChatAndCharacter(files) {
         }
         
         chats[chatId][characterName].push({
-            timestamp: parsed.timestamp,
-            filename: filename,
-            tag: parsed.tag || null
+            timestamp: file.parsed.timestamp,
+            filename: file.name,
+            tag: file.parsed.tag || null
         });
     }
     
@@ -2017,39 +1980,37 @@ async function getLastCacheForCharacter(characterName, currentChatOnly = true) {
         const characterFiles = [];
         
         for (const file of parsedFiles) {
-            const { parsed, name: filename } = file;
-            
-            if (!parsed) {
+            if (!file.parsed) {
                 continue;
             }
             
             // Фильтруем по чату, если нужно
-            if (currentChatOnly && parsed.chatId !== currentChatId) {
+            if (currentChatOnly && file.parsed.chatId !== currentChatId) {
                 continue;
             }
             
             // Проверяем по characterName в имени файла (основной способ для режима групповых чатов)
-            if (parsed.characterName) {
-                const normalizedParsedName = normalizeCharacterName(parsed.characterName);
+            if (file.parsed.characterName) {
+                const normalizedParsedName = normalizeCharacterName(file.parsed.characterName);
                 if (normalizedParsedName === normalizedCharacterName) {
                     characterFiles.push({
-                        filename: filename,
-                        timestamp: parsed.timestamp,
-                        chatId: parsed.chatId
+                        filename: file.name,
+                        timestamp: file.parsed.timestamp,
+                        chatId: file.parsed.chatId
                     });
                     continue; // Найден по characterName, не нужно проверять fallback
                 }
             }
             
             // Также проверяем по имени файла (fallback, менее надежный способ)
-            if (filename.includes(normalizedCharacterName) || filename.includes(characterName)) {
+            if (file.name.includes(normalizedCharacterName) || file.name.includes(characterName)) {
                 // Убеждаемся, что это не дубликат
-                const alreadyAdded = characterFiles.some(f => f.filename === filename);
+                const alreadyAdded = characterFiles.some(f => f.filename === file.name);
                 if (!alreadyAdded) {
                     characterFiles.push({
-                        filename: filename,
-                        timestamp: parsed.timestamp,
-                        chatId: parsed.chatId
+                        filename: file.name,
+                        timestamp: file.parsed.timestamp,
+                        chatId: file.parsed.chatId
                     });
                 }
             }

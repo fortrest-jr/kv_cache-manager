@@ -433,38 +433,22 @@ function parseSaveFilename(filename) {
     const nameWithoutExt = filename.replace(/\.bin$/, '');
     
     let tag = null;
-    let slotId = null;
     let characterName = null;
     let beforeSuffix = nameWithoutExt;
     
     // Проверяем новый формат: _character_{characterName} (всегда в конце)
     const characterMatch = nameWithoutExt.match(/_character_(.+)$/);
-    if (characterMatch) {
-        characterName = characterMatch[1];
-        beforeSuffix = nameWithoutExt.slice(0, -characterMatch[0].length);
-        
-        // Проверяем наличие _tag_{tag} перед _character
-        const tagMatch = beforeSuffix.match(/_tag_(.+)$/);
-        if (tagMatch) {
-            tag = tagMatch[1];
-            beforeSuffix = beforeSuffix.slice(0, -tagMatch[0].length);
-        }
-    } else {
-        // Старый формат для обратной совместимости: _slot{число}
-        const slotMatch = nameWithoutExt.match(/_slot(\d+)$/);
-        if (!slotMatch) {
-            return null;
-        }
-        
-        slotId = parseInt(slotMatch[1], 10);
-        beforeSuffix = nameWithoutExt.slice(0, -slotMatch[0].length);
-        
-        // Проверяем наличие _tag_{tag} перед _slot
-        const tagMatch = beforeSuffix.match(/_tag_(.+)$/);
-        if (tagMatch) {
-            tag = tagMatch[1];
-            beforeSuffix = beforeSuffix.slice(0, -tagMatch[0].length);
-        }
+    if (!characterMatch) {
+        return null;
+    }
+    characterName = characterMatch[1];
+    beforeSuffix = nameWithoutExt.slice(0, -characterMatch[0].length);
+    
+    // Проверяем наличие _tag_{tag} перед _character
+    const tagMatch = beforeSuffix.match(/_tag_(.+)$/);
+    if (tagMatch) {
+        tag = tagMatch[1];
+        beforeSuffix = beforeSuffix.slice(0, -tagMatch[0].length);
     }
     
     // Ищем timestamp (14 цифр) с конца
@@ -480,7 +464,6 @@ function parseSaveFilename(filename) {
         chatId: chatId,
         timestamp: timestamp,
         tag: tag,
-        slotId: slotId,
         characterName: characterName
     };
 }
@@ -1209,8 +1192,7 @@ function groupFilesByChat(files) {
         // Сохраняем объект файла с именем и размером
         group.files.push({
             name: filename,
-            size: file.size || 0,
-            slotId: parsed.slotId
+            size: file.size || 0
         });
     }
     
@@ -1955,7 +1937,6 @@ async function getLastCacheForCharacter(characterName, currentChatOnly = true) {
                 if (normalizedParsedName === normalizedCharacterName) {
                     characterFiles.push({
                         filename: filename,
-                        slotId: parsed.slotId, // может быть null для формата с characterName
                         timestamp: parsed.timestamp,
                         chatId: parsed.chatId
                     });
@@ -1970,7 +1951,6 @@ async function getLastCacheForCharacter(characterName, currentChatOnly = true) {
                 if (!alreadyAdded && parsed) {
                     characterFiles.push({
                         filename: filename,
-                        slotId: parsed.slotId,
                         timestamp: parsed.timestamp,
                         chatId: parsed.chatId
                     });
@@ -1994,7 +1974,6 @@ async function getLastCacheForCharacter(characterName, currentChatOnly = true) {
         
         return {
             filename: lastFile.filename,
-            slotId: lastFile.slotId
         };
     } catch (e) {
         console.error(`[KV Cache Manager] Ошибка при поиске кеша для персонажа ${characterName}:`, e);

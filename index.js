@@ -742,115 +742,91 @@ async function loadCacheForSlottedCharacters() {
     }
 }
 
-// Получение слота для персонажа (по частоте использования)
-// В слотах должны быть только персонажи текущего чата
-// Вызывается только для персонажей текущего чата (после assignCharactersToSlots)
-// @param {string} characterName - Имя персонажа
+// Получение слота для персонажа
+// 1. Если персонаж уже в слоте - возвращаем этот слот
+// 2. Если нет - находим слот с наименьшим использованием, освобождаем его, устанавливаем персонажа туда и возвращаем этот слот
+// @param {string} characterName - Имя персонажа (используется как идентификатор)
 // @param {boolean} isGeneration - true если вызывается при генерации, false если при распределении слотов
 function acquireSlot(characterName, isGeneration = false) {
     if (!extensionSettings.groupChatMode) {
         return null;
     }
     
-    // Проверяем, не прикреплен ли уже персонаж к слоту
+    // 1. Проверяем, есть ли персонаж уже в слоте - если да, возвращаем этот слот
     const existingIndex = extensionSettings.slots.findIndex(name => name === characterName);
     if (existingIndex !== -1) {
         // Персонаж уже в слоте - возвращаем существующий слот
         // Увеличиваем счетчик использования только при генерации
         if (isGeneration) {
             extensionSettings.slotsUsage[existingIndex] = (extensionSettings.slotsUsage[existingIndex] || 0) + 1;
-            console.debug(`[KV Cache Manager] Персонаж ${characterName} уже прикреплен к слоту ${existingIndex}, счетчик увеличен до: ${extensionSettings.slotsUsage[existingIndex]}`);
+            console.debug(`[KV Cache Manager] Персонаж ${characterName} уже в слоте ${existingIndex}, счетчик увеличен до: ${extensionSettings.slotsUsage[existingIndex]}`);
         } else {
-            // При распределении слотов или ручной загрузке счетчик остается как есть
-            console.debug(`[KV Cache Manager] Персонаж ${characterName} уже прикреплен к слоту ${existingIndex}, счетчик: ${extensionSettings.slotsUsage[existingIndex] || 0} (не изменяется)`);
+            console.debug(`[KV Cache Manager] Персонаж ${characterName} уже в слоте ${existingIndex}, счетчик: ${extensionSettings.slotsUsage[existingIndex] || 0}`);
         }
         saveSettingsDebounced();
         updateSlotsAvailability();
         return existingIndex;
     }
     
-    // Ищем свободный слот
-    const freeSlotIndex = extensionSettings.slots.findIndex(name => name === undefined);
-    if (freeSlotIndex !== -1) {
-        extensionSettings.slots[freeSlotIndex] = characterName;
-        // Счетчик = 1 только при генерации, иначе 0
-        extensionSettings.slotsUsage[freeSlotIndex] = isGeneration ? 1 : 0;
-        console.debug(`[KV Cache Manager] Прикреплен персонаж ${characterName} к свободному слоту ${freeSlotIndex}, счетчик: ${extensionSettings.slotsUsage[freeSlotIndex]}`);
-        saveSettingsDebounced();
-        updateSlotsAvailability();
-        return freeSlotIndex;
-    }
-    
-    // Все слоты заняты - находим слот с наименьшим счетчиком использования
-    // НЕ включаем слот, где уже находится наш персонаж (это не должно произойти, но на всякий случай)
+    // 2. Персонаж не в слоте - находим слот с наименьшим использованием
     let minUsage = Infinity;
     let minUsageIndex = -1;
     
-    extensionSettings.slotsUsage.forEach((usage, index) => {
-        // Пропускаем слот, где уже находится наш персонаж (на случай, если проверка выше не сработала)
-        if (extensionSettings.slots[index] === characterName) {
-            return;
-        }
-        
-        const currentUsage = usage || 0;
+    for (let i = 0; i < extensionSettings.slots.length; i++) {
+        const currentUsage = extensionSettings.slotsUsage[i] || 0;
         if (currentUsage < minUsage) {
             minUsage = currentUsage;
-            minUsageIndex = index;
+            minUsageIndex = i;
         }
-    });
-    
-    if (minUsageIndex !== -1) {
-        const evictedCharacter = extensionSettings.slots[minUsageIndex];
-        
-        // Дополнительная проверка: не вытесняем персонажа из его собственного слота
-        if (evictedCharacter === characterName) {
-            console.warn(`[KV Cache Manager] ОШИБКА: Попытка вытеснить персонажа ${characterName} из его собственного слота ${minUsageIndex}! Это не должно происходить. Возвращаем существующий слот.`);
-            return minUsageIndex;
-        }
-        
-        console.debug(`[KV Cache Manager] Вытесняем персонажа ${evictedCharacter} из слота ${minUsageIndex} (использование: ${minUsage}) для ${characterName}`);
-        
-        // Сохраняем кеш вытесняемого персонажа перед освобождением слота
-        // dont: разобраться точнее с моментом очистки
-        if (evictedCharacter && typeof evictedCharacter === 'string') {
-            const usageCount = extensionSettings.slotsUsage[minUsageIndex] || 0;
-            
-            // Сохраняем кеш только если персонаж использовал слот минимум 2 раза
-            if (usageCount >= 2) {
-                const chatId = getNormalizedChatId();
-                const timestamp = formatTimestamp();
-                const filename = generateSaveFilename(chatId, timestamp, evictedCharacter);
-                
-                // Сохраняем асинхронно, не блокируя выполнение
-                saveSlotCache(minUsageIndex, filename).then((success) => {
-                    if (success) {
-                        console.debug(`[KV Cache Manager] Сохранен кеш вытесняемого персонажа ${evictedCharacter} в файл ${filename}`);
-                        // Выполняем ротацию файлов для вытесняемого персонажа
-                        rotateCharacterFiles(evictedCharacter).catch((e) => {
-                            console.error(`[KV Cache Manager] Ошибка при ротации файлов для вытесняемого персонажа ${evictedCharacter}:`, e);
-                        });
-                    }
-                }).catch((e) => {
-                    console.error(`[KV Cache Manager] Ошибка при сохранении кеша вытесняемого персонажа ${evictedCharacter}:`, e);
-                });
-            } else {
-                console.debug(`[KV Cache Manager] Пропускаем сохранение кеша для ${evictedCharacter} (использование: ${usageCount} < 2)`);
-            }
-        }
-        
-        extensionSettings.slots[minUsageIndex] = characterName;
-        // Счетчик = 1 только при генерации, иначе 0
-        extensionSettings.slotsUsage[minUsageIndex] = isGeneration ? 1 : 0;
-        console.debug(`[KV Cache Manager] Персонаж ${characterName} прикреплен к слоту ${minUsageIndex} (вытеснен ${evictedCharacter}), счетчик: ${extensionSettings.slotsUsage[minUsageIndex]}`);
-        
-        saveSettingsDebounced();
-        updateSlotsAvailability();
-        
-        return minUsageIndex;
     }
     
-    console.warn('[KV Cache Manager] Не удалось найти слот для персонажа');
-    return null;
+    if (minUsageIndex === -1) {
+        console.warn('[KV Cache Manager] Не удалось найти слот для персонажа');
+        return null;
+    }
+    
+    // Освобождаем слот с наименьшим использованием
+    const evictedCharacter = extensionSettings.slots[minUsageIndex];
+    
+    // Сохраняем кеш вытесняемого персонажа перед освобождением слота
+    // TODO: разобраться точнее с моментом очистки
+    if (evictedCharacter && typeof evictedCharacter === 'string') {
+        const usageCount = extensionSettings.slotsUsage[minUsageIndex] || 0;
+        
+        // Сохраняем кеш только если персонаж использовал слот минимум 2 раза
+        if (usageCount >= 2) {
+            const chatId = getNormalizedChatId();
+            const timestamp = formatTimestamp();
+            const filename = generateSaveFilename(chatId, timestamp, evictedCharacter);
+            
+            // Сохраняем асинхронно, не блокируя выполнение
+            saveSlotCache(minUsageIndex, filename).then((success) => {
+                if (success) {
+                    console.debug(`[KV Cache Manager] Сохранен кеш вытесняемого персонажа ${evictedCharacter} в файл ${filename}`);
+                    // Выполняем ротацию файлов для вытесняемого персонажа
+                    rotateCharacterFiles(evictedCharacter).catch((e) => {
+                        console.error(`[KV Cache Manager] Ошибка при ротации файлов для вытесняемого персонажа ${evictedCharacter}:`, e);
+                    });
+                }
+            }).catch((e) => {
+                console.error(`[KV Cache Manager] Ошибка при сохранении кеша вытесняемого персонажа ${evictedCharacter}:`, e);
+            });
+        } else {
+            console.debug(`[KV Cache Manager] Пропускаем сохранение кеша для ${evictedCharacter} (использование: ${usageCount} < 2)`);
+        }
+    }
+    
+    // Устанавливаем персонажа в освобожденный слот
+    extensionSettings.slots[minUsageIndex] = characterName;
+    // Счетчик = 1 только при генерации, иначе 0
+    extensionSettings.slotsUsage[minUsageIndex] = isGeneration ? 1 : 0;
+    
+    console.debug(`[KV Cache Manager] Персонаж ${characterName} установлен в слот ${minUsageIndex}${evictedCharacter ? ` (вытеснен ${evictedCharacter}, использование: ${minUsage})` : ' (свободный слот)'}, счетчик: ${extensionSettings.slotsUsage[minUsageIndex]}`);
+    
+    saveSettingsDebounced();
+    updateSlotsAvailability();
+    
+    return minUsageIndex;
 }
 
 // Освобождение слота

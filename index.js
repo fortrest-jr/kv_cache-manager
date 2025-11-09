@@ -619,21 +619,29 @@ async function assignCharactersToSlots() {
         const currentCharacter = extensionSettings.slots[i];
         if (currentCharacter && typeof currentCharacter === 'string' && !chatCharactersSet.has(currentCharacter)) {
             // Персонаж из другого чата - сохраняем его кеш перед очисткой
-            const chatId = getNormalizedChatId();
-            const timestamp = formatTimestamp();
-            const filename = generateSaveFilename(chatId, timestamp, currentCharacter);
+            // TODO: разобраться точнее с моментом очистки
+            const usageCount = extensionSettings.slotsUsage[i] || 0;
             
-            // Сохраняем асинхронно, не блокируя выполнение
-            saveSlotCache(i, filename).then((success) => {
-                if (success) {
-                    console.debug(`[KV Cache Manager] Сохранен кеш персонажа ${currentCharacter} из другого чата перед очисткой слота`);
-                    rotateCharacterFiles(currentCharacter).catch((e) => {
-                        console.error(`[KV Cache Manager] Ошибка при ротации файлов для персонажа ${currentCharacter}:`, e);
-                    });
-                }
-            }).catch((e) => {
-                console.error(`[KV Cache Manager] Ошибка при сохранении кеша персонажа ${currentCharacter}:`, e);
-            });
+            // Сохраняем кеш только если персонаж использовал слот минимум 2 раза
+            if (usageCount >= 2) {
+                const chatId = getNormalizedChatId();
+                const timestamp = formatTimestamp();
+                const filename = generateSaveFilename(chatId, timestamp, currentCharacter);
+                
+                // Сохраняем асинхронно, не блокируя выполнение
+                saveSlotCache(i, filename).then((success) => {
+                    if (success) {
+                        console.debug(`[KV Cache Manager] Сохранен кеш персонажа ${currentCharacter} из другого чата перед очисткой слота`);
+                        rotateCharacterFiles(currentCharacter).catch((e) => {
+                            console.error(`[KV Cache Manager] Ошибка при ротации файлов для персонажа ${currentCharacter}:`, e);
+                        });
+                    }
+                }).catch((e) => {
+                    console.error(`[KV Cache Manager] Ошибка при сохранении кеша персонажа ${currentCharacter}:`, e);
+                });
+            } else {
+                console.debug(`[KV Cache Manager] Пропускаем сохранение кеша для ${currentCharacter} из другого чата (использование: ${usageCount} < 2)`);
+            }
             
             // Очищаем слот
             extensionSettings.slots[i] = undefined;
@@ -751,23 +759,31 @@ function acquireSlot(characterName) {
         console.debug(`[KV Cache Manager] Вытесняем персонажа ${evictedCharacter} из слота ${minUsageIndex} (использование: ${minUsage}) для ${characterName}`);
         
         // Сохраняем кеш вытесняемого персонажа перед освобождением слота
+        // dont: разобраться точнее с моментом очистки
         if (evictedCharacter && typeof evictedCharacter === 'string') {
-            const chatId = getNormalizedChatId();
-            const timestamp = formatTimestamp();
-            const filename = generateSaveFilename(chatId, timestamp, evictedCharacter);
+            const usageCount = extensionSettings.slotsUsage[minUsageIndex] || 0;
             
-            // Сохраняем асинхронно, не блокируя выполнение
-            saveSlotCache(minUsageIndex, filename).then((success) => {
-                if (success) {
-                    console.debug(`[KV Cache Manager] Сохранен кеш вытесняемого персонажа ${evictedCharacter} в файл ${filename}`);
-                    // Выполняем ротацию файлов для вытесняемого персонажа
-                    rotateCharacterFiles(evictedCharacter).catch((e) => {
-                        console.error(`[KV Cache Manager] Ошибка при ротации файлов для вытесняемого персонажа ${evictedCharacter}:`, e);
-                    });
-                }
-            }).catch((e) => {
-                console.error(`[KV Cache Manager] Ошибка при сохранении кеша вытесняемого персонажа ${evictedCharacter}:`, e);
-            });
+            // Сохраняем кеш только если персонаж использовал слот минимум 2 раза
+            if (usageCount >= 2) {
+                const chatId = getNormalizedChatId();
+                const timestamp = formatTimestamp();
+                const filename = generateSaveFilename(chatId, timestamp, evictedCharacter);
+                
+                // Сохраняем асинхронно, не блокируя выполнение
+                saveSlotCache(minUsageIndex, filename).then((success) => {
+                    if (success) {
+                        console.debug(`[KV Cache Manager] Сохранен кеш вытесняемого персонажа ${evictedCharacter} в файл ${filename}`);
+                        // Выполняем ротацию файлов для вытесняемого персонажа
+                        rotateCharacterFiles(evictedCharacter).catch((e) => {
+                            console.error(`[KV Cache Manager] Ошибка при ротации файлов для вытесняемого персонажа ${evictedCharacter}:`, e);
+                        });
+                    }
+                }).catch((e) => {
+                    console.error(`[KV Cache Manager] Ошибка при сохранении кеша вытесняемого персонажа ${evictedCharacter}:`, e);
+                });
+            } else {
+                console.debug(`[KV Cache Manager] Пропускаем сохранение кеша для ${evictedCharacter} (использование: ${usageCount} < 2)`);
+            }
         }
         
         extensionSettings.slots[minUsageIndex] = characterName;
@@ -1233,6 +1249,7 @@ async function saveCache(requestTag = false) {
     
     let savedCount = 0;
     let errors = [];
+    const successfullySaved = []; // Список успешно сохраненных персонажей
     
     // Сохраняем каждого персонажа с индивидуальным timestamp
     for (const { characterName, slotIndex } of charactersToSave) {
@@ -1248,7 +1265,32 @@ async function saveCache(requestTag = false) {
             console.debug(`[KV Cache Manager] Сохранение персонажа ${characterName} в слот ${slotIndex} с именем файла: ${filename}`);
             
             if (await saveSlotCache(slotIndex, filename)) {
+                // Проверяем размер сохраненного файла
+                try {
+                    // Ждем немного, чтобы файл точно был сохранен на сервере
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    
+                    const filesList = await getFilesList();
+                    const savedFile = filesList.find(file => file.name === filename);
+                    
+                    if (savedFile) {
+                        const fileSizeMB = savedFile.size / (1024 * 1024); // Размер в мегабайтах
+                        
+                        if (fileSizeMB < 1) {
+                            // Файл меньше 1 МБ - считаем невалидным и удаляем
+                            console.warn(`[KV Cache Manager] Файл ${filename} слишком мал (${fileSizeMB.toFixed(2)} МБ), удаляем как невалидный`);
+                            await deleteFile(filename);
+                            errors.push(`${characterName}: файл слишком мал`);
+                            continue;
+                        }
+                    }
+                } catch (e) {
+                    console.warn(`[KV Cache Manager] Не удалось проверить размер файла ${filename}:`, e);
+                    // Продолжаем, даже если не удалось проверить размер
+                }
+                
                 savedCount++;
+                successfullySaved.push(characterName);
                 console.debug(`[KV Cache Manager] Сохранен кеш для персонажа ${characterName}: ${filename}`);
                 
                 // Выполняем ротацию файлов для этого персонажа (только для автосохранений)
@@ -1265,15 +1307,17 @@ async function saveCache(requestTag = false) {
     }
     
     if (savedCount > 0) {
-        // Формируем сообщение об успехе
+        // Формируем сообщение об успехе с списком персонажей
+        const charactersList = successfullySaved.join(', ');
+        
         if (errors.length > 0) {
-            showToast('warning', `Сохранено ${savedCount} из ${charactersToSave.length} персонажей. Ошибки: ${errors.join(', ')}`);
+            showToast('warning', `Сохранено ${savedCount} из ${charactersToSave.length} персонажей: ${charactersList}. Ошибки: ${errors.join(', ')}`);
         } else {
             // Для автосохранений (без тега) показываем другое сообщение
             if (!tag) {
-                showToast('success', `Автосохранено ${savedCount} персонажей`, 'Автосохранение');
+                showToast('success', `Автосохранено ${savedCount} персонажей: ${charactersList}`, 'Автосохранение');
             } else {
-                showToast('success', `Сохранено ${savedCount} персонажей`);
+                showToast('success', `Сохранено ${savedCount} персонажей: ${charactersList}`);
             }
         }
         
@@ -2460,12 +2504,20 @@ jQuery(async () => {
                     }
                     
                     // Сохраняем кеш вытесняемого персонажа ДО вызова acquireSlot
+                    // TODO: разобраться точнее с моментом очистки
                     if (evictedCharacter && evictedCharacter !== characterName && evictedSlotIndex !== -1) {
-                        const chatId = getNormalizedChatId();
-                        const timestamp = formatTimestamp();
-                        const filename = generateSaveFilename(chatId, timestamp, evictedCharacter);
-                        await saveSlotCache(evictedSlotIndex, filename);
-                        console.debug(`[KV Cache Manager] Сохранен кеш вытесняемого персонажа ${evictedCharacter} в файл ${filename}`);
+                        const usageCount = extensionSettings.slotsUsage[evictedSlotIndex] || 0;
+                        
+                        // Сохраняем кеш только если персонаж использовал слот минимум 2 раза
+                        if (usageCount >= 2) {
+                            const chatId = getNormalizedChatId();
+                            const timestamp = formatTimestamp();
+                            const filename = generateSaveFilename(chatId, timestamp, evictedCharacter);
+                            await saveSlotCache(evictedSlotIndex, filename);
+                            console.debug(`[KV Cache Manager] Сохранен кеш вытесняемого персонажа ${evictedCharacter} в файл ${filename}`);
+                        } else {
+                            console.debug(`[KV Cache Manager] Пропускаем сохранение кеша для ${evictedCharacter} (использование: ${usageCount} < 2)`);
+                        }
                     }
                     
                     // Получаем слот для загрузки (теперь acquireSlot может безопасно вытеснить)

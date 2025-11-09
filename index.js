@@ -744,7 +744,8 @@ async function loadCacheForSlottedCharacters() {
 
 // Получение слота для персонажа
 // 1. Если персонаж уже в слоте - возвращаем этот слот
-// 2. Если нет - находим слот с наименьшим использованием, освобождаем его, устанавливаем персонажа туда и возвращаем этот слот
+// 2. Если нет - ищем пустой слот, возвращаем его
+// 3. Если пустых нет - освобождаем слот с наименьшим использованием и возвращаем его
 // @param {string} characterName - Имя персонажа (используется как идентификатор)
 // @param {boolean} isGeneration - true если вызывается при генерации, false если при распределении слотов
 function acquireSlot(characterName, isGeneration = false) {
@@ -768,7 +769,20 @@ function acquireSlot(characterName, isGeneration = false) {
         return existingIndex;
     }
     
-    // 2. Персонаж не в слоте - находим слот с наименьшим использованием
+    // 2. Персонаж не в слоте - ищем пустой слот
+    const freeSlotIndex = extensionSettings.slots.findIndex(name => name === undefined);
+    if (freeSlotIndex !== -1) {
+        // Найден пустой слот - устанавливаем персонажа туда
+        extensionSettings.slots[freeSlotIndex] = characterName;
+        // Счетчик = 1 только при генерации, иначе 0
+        extensionSettings.slotsUsage[freeSlotIndex] = isGeneration ? 1 : 0;
+        console.debug(`[KV Cache Manager] Персонаж ${characterName} установлен в пустой слот ${freeSlotIndex}, счетчик: ${extensionSettings.slotsUsage[freeSlotIndex]}`);
+        saveSettingsDebounced();
+        updateSlotsAvailability();
+        return freeSlotIndex;
+    }
+    
+    // 3. Пустых слотов нет - находим слот с наименьшим использованием и освобождаем его
     let minUsage = Infinity;
     let minUsageIndex = -1;
     

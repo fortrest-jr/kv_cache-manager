@@ -2534,30 +2534,15 @@ jQuery(async () => {
             }
             
             const characterName = character.name;
-            currentSlot = null;
+            currentSlot = acquireSlot(characterName, true);
             
-            // Проверяем, прикреплен ли персонаж к слоту
-            const existingSlotIndex = currentSlots ? currentSlots.findIndex(slot => slot?.characterName === characterName) : -1;
-            
-            if (existingSlotIndex !== -1) {
-                // Персонаж уже прикреплен к слоту
-                currentSlot = existingSlotIndex;
-                // Увеличиваем счетчик использования
-                if (currentSlots[existingSlotIndex]) {
-                    currentSlots[existingSlotIndex].usage = (currentSlots[existingSlotIndex].usage || 0) + 1;
-                }
-                updateSlotsAvailability();
-                console.debug(`[KV Cache Manager] Персонаж ${characterName} уже прикреплен к слоту ${existingSlotIndex}`);
-            } else {
-                // Персонаж не прикреплен к слоту
-                // Это не должно происходить, так как assignCharactersToSlots должен был распределить всех персонажей
-                // Но на всякий случай прикрепляем к слоту без кеша
-                // Кеш должен был быть загружен при переключении чата через assignCharactersToSlots
-                console.warn(`[KV Cache Manager] Персонаж ${characterName} не прикреплен к слоту, хотя должен быть (возможно, слоты не были распределены)`);
-                currentSlot = acquireSlot(characterName, true); // true = при генерации, счетчик должен быть 1
+            if (currentSlot === null) {
+                console.warn(`[KV Cache Manager] Не удалось получить слот для персонажа ${characterName} при генерации`);
+                showToast('error', `Не удалось получить слот для персонажа ${characterName} при генерации`, 'Генерация');
             }
         } catch (error) {
             console.error('[KV Cache Manager] Ошибка в перехватчике генерации:', error);
+            showToast('error', `Ошибка при перехвате генерации: ${error.message}`, 'Генерация');
             // Не прерываем генерацию при ошибке
         }
         

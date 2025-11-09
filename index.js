@@ -647,7 +647,6 @@ async function assignCharactersToSlots() {
     
     // Получаем персонажей текущего чата
     const chatCharacters = await getChatCharacters();
-    const chatCharactersSet = new Set(chatCharacters);
     
     // Инициализируем слоты, если еще не инициализированы
     if (!currentSlots || currentSlots.length === 0) {

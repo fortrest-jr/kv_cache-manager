@@ -755,13 +755,14 @@ function acquireSlot(characterName, isGeneration = false) {
     // Проверяем, не прикреплен ли уже персонаж к слоту
     const existingIndex = extensionSettings.slots.findIndex(name => name === characterName);
     if (existingIndex !== -1) {
+        // Персонаж уже в слоте - возвращаем существующий слот
         // Увеличиваем счетчик использования только при генерации
         if (isGeneration) {
             extensionSettings.slotsUsage[existingIndex] = (extensionSettings.slotsUsage[existingIndex] || 0) + 1;
-            console.debug(`[KV Cache Manager] Персонаж ${characterName} уже прикреплен к слоту ${existingIndex}, счетчик: ${extensionSettings.slotsUsage[existingIndex]}`);
+            console.debug(`[KV Cache Manager] Персонаж ${characterName} уже прикреплен к слоту ${existingIndex}, счетчик увеличен до: ${extensionSettings.slotsUsage[existingIndex]}`);
         } else {
-            // При распределении слотов счетчик остается как есть (обычно 0)
-            console.debug(`[KV Cache Manager] Персонаж ${characterName} уже прикреплен к слоту ${existingIndex}, счетчик: ${extensionSettings.slotsUsage[existingIndex] || 0}`);
+            // При распределении слотов или ручной загрузке счетчик остается как есть
+            console.debug(`[KV Cache Manager] Персонаж ${characterName} уже прикреплен к слоту ${existingIndex}, счетчик: ${extensionSettings.slotsUsage[existingIndex] || 0} (не изменяется)`);
         }
         saveSettingsDebounced();
         updateSlotsAvailability();
@@ -781,10 +782,16 @@ function acquireSlot(characterName, isGeneration = false) {
     }
     
     // Все слоты заняты - находим слот с наименьшим счетчиком использования
+    // НЕ включаем слот, где уже находится наш персонаж (это не должно произойти, но на всякий случай)
     let minUsage = Infinity;
     let minUsageIndex = -1;
     
     extensionSettings.slotsUsage.forEach((usage, index) => {
+        // Пропускаем слот, где уже находится наш персонаж (на случай, если проверка выше не сработала)
+        if (extensionSettings.slots[index] === characterName) {
+            return;
+        }
+        
         const currentUsage = usage || 0;
         if (currentUsage < minUsage) {
             minUsage = currentUsage;
@@ -794,6 +801,13 @@ function acquireSlot(characterName, isGeneration = false) {
     
     if (minUsageIndex !== -1) {
         const evictedCharacter = extensionSettings.slots[minUsageIndex];
+        
+        // Дополнительная проверка: не вытесняем персонажа из его собственного слота
+        if (evictedCharacter === characterName) {
+            console.warn(`[KV Cache Manager] ОШИБКА: Попытка вытеснить персонажа ${characterName} из его собственного слота ${minUsageIndex}! Это не должно происходить. Возвращаем существующий слот.`);
+            return minUsageIndex;
+        }
+        
         console.debug(`[KV Cache Manager] Вытесняем персонажа ${evictedCharacter} из слота ${minUsageIndex} (использование: ${minUsage}) для ${characterName}`);
         
         // Сохраняем кеш вытесняемого персонажа перед освобождением слота
@@ -2276,16 +2290,19 @@ async function loadSelectedCache() {
                 
                 if (slotIndex !== -1) {
                     // Персонаж уже в слотах - загружаем кеш в существующий слот
-                    console.debug(`[KV Cache Manager] Персонаж ${characterName} уже в слоте ${slotIndex}, загружаю кеш`);
+                    console.debug(`[KV Cache Manager] Персонаж ${characterName} уже в слоте ${slotIndex}, загружаю кеш в этот же слот`);
                 } else {
                     // Персонаж не в слотах - выделяем новый слот по общей логике (ручная загрузка, не генерация - счетчик = 0)
                     console.debug(`[KV Cache Manager] Персонаж ${characterName} не в слотах, выделяю новый слот для загрузки кеша`);
+                    console.debug(`[KV Cache Manager] Текущие слоты:`, extensionSettings.slots);
                     slotIndex = acquireSlot(characterName, false);
                     
                     if (slotIndex === null) {
                         errors.push(`${characterName}: не удалось получить слот`);
                         continue;
                     }
+                    
+                    console.debug(`[KV Cache Manager] Персонаж ${characterName} помещен в слот ${slotIndex}`);
                 }
                 
                 // Счетчик будет сброшен в 0 в loadSlotCache при загрузке кеша

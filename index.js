@@ -129,11 +129,15 @@ async function saveCharacterCache(characterName, slotIndex) {
 // @param {number} usageCount - количество использований слота
 // @returns {Promise<boolean>} - true если кеш был сохранен, false если пропущен или ошибка
 async function saveCacheBeforeEviction(characterName, slotIndex, usageCount = 0) {
+    showToast('info', `saveCacheBeforeEviction вызван для: ${characterName} (слот: ${slotIndex}, использование: ${usageCount})`, 'Сохранение перед вытеснением');
+    
     if (!characterName || typeof characterName !== 'string') {
+        showToast('warning', 'Некорректное имя персонажа в saveCacheBeforeEviction', 'Сохранение перед вытеснением');
         return false;
     }
     
     if (slotIndex === null || slotIndex === undefined) {
+        showToast('warning', 'Некорректный индекс слота в saveCacheBeforeEviction', 'Сохранение перед вытеснением');
         return false;
     }
     
@@ -141,29 +145,36 @@ async function saveCacheBeforeEviction(characterName, slotIndex, usageCount = 0)
     const MIN_USAGE_FOR_SAVE = 2;
     if (usageCount < MIN_USAGE_FOR_SAVE) {
         console.debug(`[KV Cache Manager] Пропускаем сохранение кеша для ${characterName} (использование: ${usageCount} < ${MIN_USAGE_FOR_SAVE})`);
+        showToast('info', `Пропуск сохранения для ${characterName} (использование: ${usageCount} < ${MIN_USAGE_FOR_SAVE})`, 'Сохранение перед вытеснением');
         return false;
     }
     
     try {
+        showToast('info', `Подготовка сохранения кеша для ${characterName}...`, 'Сохранение перед вытеснением');
         const chatId = getNormalizedChatId();
         const timestamp = formatTimestamp();
         const filename = generateSaveFilename(chatId, timestamp, characterName);
         
         console.debug(`[KV Cache Manager] Сохранение кеша перед вытеснением: персонаж ${characterName}, слот ${slotIndex}`);
+        showToast('info', `Сохранение кеша в файл: ${filename}...`, 'Сохранение перед вытеснением');
         
         const success = await saveSlotCache(slotIndex, filename);
         
         if (success) {
             console.debug(`[KV Cache Manager] Сохранен кеш вытесняемого персонажа ${characterName} в файл ${filename}`);
+            showToast('info', `Выполнение ротации файлов для ${characterName}...`, 'Сохранение перед вытеснением');
             // Выполняем ротацию файлов для вытесняемого персонажа
             await rotateCharacterFiles(characterName);
+            showToast('success', `Кеш ${characterName} сохранен и ротация выполнена`, 'Сохранение перед вытеснением');
             return true;
         } else {
             console.error(`[KV Cache Manager] Не удалось сохранить кеш для вытесняемого персонажа ${characterName}`);
+            showToast('error', `Не удалось сохранить кеш для ${characterName}`, 'Сохранение перед вытеснением');
             return false;
         }
     } catch (e) {
         console.error(`[KV Cache Manager] Ошибка при сохранении кеша вытесняемого персонажа ${characterName}:`, e);
+        showToast('error', `Ошибка при сохранении кеша для ${characterName}: ${e.message}`, 'Сохранение перед вытеснением');
         return false;
     }
 }
@@ -760,12 +771,16 @@ async function loadCacheForSlottedCharacters() {
 // @param {string} characterName - Имя персонажа (используется как идентификатор)
 // @param {boolean} isGeneration - true если вызывается при генерации, false если при распределении слотов
 async function acquireSlot(characterName, isGeneration = false) {
+    showToast('info', `acquireSlot вызван для: ${characterName} (генерация: ${isGeneration})`, 'Получение слота');
+    
     if (!extensionSettings.groupChatMode) {
+        showToast('warning', 'Режим групповых чатов отключен в acquireSlot', 'Получение слота');
         return null;
     }
     
     // Нормализуем имя персонажа для единообразного сравнения
     const normalizedName = normalizeCharacterName(characterName);
+    showToast('info', `Нормализованное имя: ${normalizedName}`, 'Получение слота');
     
     // 1. Проверяем, есть ли персонаж уже в слоте - если да, возвращаем этот слот
     // Сравниваем нормализованные имена, так как в слотах хранятся нормализованные имена
@@ -779,12 +794,16 @@ async function acquireSlot(characterName, isGeneration = false) {
         if (isGeneration) {
             currentSlots[existingIndex].usage = (currentSlots[existingIndex].usage || 0) + 1;
             console.debug(`[KV Cache Manager] Персонаж ${characterName} уже в слоте ${existingIndex}, счетчик увеличен до: ${currentSlots[existingIndex].usage}`);
+            showToast('success', `Персонаж ${characterName} уже в слоте ${existingIndex}, счетчик: ${currentSlots[existingIndex].usage}`, 'Получение слота');
         } else {
             console.debug(`[KV Cache Manager] Персонаж ${characterName} уже в слоте ${existingIndex}, счетчик: ${currentSlots[existingIndex].usage || 0}`);
+            showToast('success', `Персонаж ${characterName} уже в слоте ${existingIndex}, счетчик: ${currentSlots[existingIndex].usage || 0}`, 'Получение слота');
         }
         updateSlotsAvailability();
         return existingIndex;
     }
+    
+    showToast('info', `Персонаж ${characterName} не найден в слотах, ищем пустой слот...`, 'Получение слота');
     
     // 2. Персонаж не в слоте - ищем пустой слот
     const freeSlotIndex = currentSlots.findIndex(slot => !slot?.characterName);
@@ -795,9 +814,12 @@ async function acquireSlot(characterName, isGeneration = false) {
             usage: isGeneration ? 1 : 0
         };
         console.debug(`[KV Cache Manager] Персонаж ${characterName} установлен в пустой слот ${freeSlotIndex}, счетчик: ${currentSlots[freeSlotIndex].usage}`);
+        showToast('success', `Персонаж ${characterName} установлен в пустой слот ${freeSlotIndex}`, 'Получение слота');
         updateSlotsAvailability();
         return freeSlotIndex;
     }
+    
+    showToast('warning', `Пустых слотов нет, ищем слот с наименьшим использованием...`, 'Получение слота');
     
     // 3. Пустых слотов нет - находим слот с наименьшим использованием и освобождаем его
     let minUsage = Infinity;
@@ -813,6 +835,7 @@ async function acquireSlot(characterName, isGeneration = false) {
     
     if (minUsageIndex === -1) {
         console.warn('[KV Cache Manager] Не удалось найти слот для персонажа');
+        showToast('error', 'Не удалось найти слот для персонажа', 'Получение слота');
         return null;
     }
     
@@ -820,13 +843,18 @@ async function acquireSlot(characterName, isGeneration = false) {
     const evictedSlot = currentSlots[minUsageIndex];
     const evictedCharacter = evictedSlot?.characterName;
     
+    showToast('info', `Найден слот ${minUsageIndex} с использованием ${minUsage}${evictedCharacter ? ` (персонаж: ${evictedCharacter})` : ''}`, 'Получение слота');
+    
     // Сохраняем кеш вытесняемого персонажа перед освобождением слота
     // Важно: дожидаемся завершения сохранения перед вытеснением, чтобы избежать потери данных
     if (evictedCharacter && typeof evictedCharacter === 'string') {
         const usageCount = evictedSlot.usage || 0;
+        showToast('info', `Сохранение кеша вытесняемого персонажа ${evictedCharacter} (использование: ${usageCount})...`, 'Получение слота');
         
         // Используем единую функцию для сохранения кеша перед вытеснением
         await saveCacheBeforeEviction(evictedCharacter, minUsageIndex, usageCount);
+        
+        showToast('success', `Кеш вытесняемого персонажа ${evictedCharacter} сохранен`, 'Получение слота');
     }
     
     // Устанавливаем персонажа в освобожденный слот только после завершения сохранения
@@ -837,6 +865,7 @@ async function acquireSlot(characterName, isGeneration = false) {
     };
     
     console.debug(`[KV Cache Manager] Персонаж ${characterName} установлен в слот ${minUsageIndex}${evictedCharacter ? ` (вытеснен ${evictedCharacter}, использование: ${minUsage})` : ' (свободный слот)'}, счетчик: ${currentSlots[minUsageIndex].usage}`);
+    showToast('success', `Персонаж ${characterName} установлен в слот ${minUsageIndex}${evictedCharacter ? ` (вытеснен ${evictedCharacter})` : ''}`, 'Получение слота');
     
     updateSlotsAvailability();
     
@@ -2587,34 +2616,45 @@ jQuery(async () => {
      * @param {string} type - Тип генерации ('normal', 'regenerate', 'swipe', 'quiet', 'impersonate', 'continue')
      */
     async function KVCacheManagerInterceptor(chat, contextSize, abort, type) {
+        showToast('info', `Перехват генерации вызван (тип: ${type})`, 'Генерация');
+        
         // Пропускаем тихие генерации и impersonate
         if (type === 'quiet' || type === 'impersonate') {
+            showToast('info', `Пропуск генерации (тип: ${type})`, 'Генерация');
             return;
         }
         
         // Работаем только в режиме групповых чатов
         if (!extensionSettings.groupChatMode) {
+            showToast('warning', 'Режим групповых чатов отключен, перехват пропущен', 'Генерация');
             return;
         }
         
         try {
+            showToast('info', 'Получение контекста...', 'Генерация');
             const context = getContext();
             
             if (!context || !context.characterId) {
+                showToast('warning', 'Контекст или characterId не найдены', 'Генерация');
                 return;
             }
             
+            showToast('info', `Контекст получен (characterId: ${context.characterId})`, 'Генерация');
             const character = context.characters[context.characterId];
             if (!character || !character.name) {
+                showToast('warning', 'Персонаж не найден в контексте', 'Генерация');
                 return;
             }
             
             const characterName = character.name;
+            showToast('info', `Получение слота для персонажа: ${characterName}`, 'Генерация');
             currentSlot = await acquireSlot(characterName, true);
             
             if (currentSlot === null) {
                 console.warn(`[KV Cache Manager] Не удалось получить слот для персонажа ${characterName} при генерации`);
                 showToast('error', `Не удалось получить слот для персонажа ${characterName} при генерации`, 'Генерация');
+            } else {
+                showToast('success', `Слот ${currentSlot} получен для персонажа ${characterName}`, 'Генерация');
             }
         } catch (error) {
             console.error('[KV Cache Manager] Ошибка в перехватчике генерации:', error);

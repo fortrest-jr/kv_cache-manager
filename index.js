@@ -2209,10 +2209,7 @@ async function loadSelectedCache() {
     const chats = loadModalData.chats;
     const chatCharacters = chats[chatId] || {};
     
-    // Закрываем модалку
     closeLoadModal();
-    
-    showToast('info', `Начинаю загрузку кешей для ${Object.keys(selectedCharacters).length} персонажей...`, 'Загрузка');
     
     let loadedCount = 0;
     let errors = [];
@@ -2222,7 +2219,20 @@ async function loadSelectedCache() {
         if (!currentSlots || currentSlots.length === 0) {
             await initializeSlots();
         }
+        
+        // Проверяем, что не выбрано больше персонажей, чем доступно слотов
+        const selectedCount = Object.keys(selectedCharacters).length;
+        const totalSlots = currentSlots.length;
+        
+        if (selectedCount > totalSlots) {
+            showToast('error', `Выбрано ${selectedCount} персонажей, но доступно только ${totalSlots} слотов. Выберите не более ${totalSlots} персонажей.`);
+            return;
+        }
     }
+    
+    showToast('info', `Начинаю загрузку кешей для ${Object.keys(selectedCharacters).length} персонажей...`, 'Загрузка');
+    
+    // TODO: сделать снятие выбора с персонажей при загрузке
     
     // Загружаем кеши для каждого выбранного персонажа
     for (const characterName in selectedCharacters) {

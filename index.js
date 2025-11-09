@@ -1020,7 +1020,13 @@ async function loadSlotCache(slotId, filename) {
             return false;
         }
         
-        console.debug(`[KV Cache Manager] Кеш успешно загружен для слота ${slotId}`);
+        // При любой загрузке кеша сбрасываем счетчик использования в 0
+        if (extensionSettings.groupChatMode && extensionSettings.slotsUsage && slotId !== null && slotId !== undefined) {
+            extensionSettings.slotsUsage[slotId] = 0;
+            saveSettingsDebounced();
+        }
+        
+        console.debug(`[KV Cache Manager] Кеш успешно загружен для слота ${slotId}, счетчик использования сброшен в 0`);
         return true;
     } catch (e) {
         if (e.name === 'AbortError') {
@@ -2035,14 +2041,17 @@ async function loadFileGroup(group, chatId) {
             continue;
         }
         
-        // Загружаем кеш для персонажей, помещая их в слоты при необходимости
+        // Загружаем кеш для персонажей, используя существующие слоты или выделяя новые
         if (extensionSettings.groupChatMode) {
             // Проверяем, есть ли персонаж в слотах
             let slotIndex = extensionSettings.slots ? extensionSettings.slots.findIndex(name => name === parsed.characterName) : -1;
             
-            if (slotIndex === -1) {
-                // Персонаж не в слотах - помещаем его в слот (ручная загрузка, не генерация - счетчик = 0)
-                console.debug(`[KV Cache Manager] Персонаж ${parsed.characterName} не в слотах, помещаю в слот для загрузки кеша`);
+            if (slotIndex !== -1) {
+                // Персонаж уже в слотах - загружаем кеш в существующий слот
+                console.debug(`[KV Cache Manager] Персонаж ${parsed.characterName} уже в слоте ${slotIndex}, загружаю кеш`);
+            } else {
+                // Персонаж не в слотах - выделяем новый слот по общей логике (ручная загрузка, не генерация - счетчик = 0)
+                console.debug(`[KV Cache Manager] Персонаж ${parsed.characterName} не в слотах, выделяю новый слот для загрузки кеша`);
                 slotIndex = acquireSlot(parsed.characterName, false);
                 
                 if (slotIndex === null) {
@@ -2051,6 +2060,7 @@ async function loadFileGroup(group, chatId) {
                 }
             }
             
+            // Счетчик будет сброшен в 0 в loadSlotCache при загрузке кеша
             filesToLoad.push({
                 filename: filename,
                 slotId: slotIndex,
@@ -2261,12 +2271,15 @@ async function loadSelectedCache() {
             let slotIndex = null;
             
             if (extensionSettings.groupChatMode) {
-                // В режиме групповых чатов проверяем, есть ли персонаж в слотах
+                // Проверяем, есть ли персонаж в слотах
                 slotIndex = extensionSettings.slots ? extensionSettings.slots.findIndex(name => name === characterName) : -1;
                 
-                if (slotIndex === -1) {
-                    // Персонаж не в слотах - помещаем его в слот (ручная загрузка, не генерация - счетчик = 0)
-                    console.debug(`[KV Cache Manager] Персонаж ${characterName} не в слотах, помещаю в слот для загрузки кеша`);
+                if (slotIndex !== -1) {
+                    // Персонаж уже в слотах - загружаем кеш в существующий слот
+                    console.debug(`[KV Cache Manager] Персонаж ${characterName} уже в слоте ${slotIndex}, загружаю кеш`);
+                } else {
+                    // Персонаж не в слотах - выделяем новый слот по общей логике (ручная загрузка, не генерация - счетчик = 0)
+                    console.debug(`[KV Cache Manager] Персонаж ${characterName} не в слотах, выделяю новый слот для загрузки кеша`);
                     slotIndex = acquireSlot(characterName, false);
                     
                     if (slotIndex === null) {
@@ -2274,6 +2287,8 @@ async function loadSelectedCache() {
                         continue;
                     }
                 }
+                
+                // Счетчик будет сброшен в 0 в loadSlotCache при загрузке кеша
             } else {
                 // В обычном режиме используем первый активный слот
                 const activeSlots = await getActiveSlots();

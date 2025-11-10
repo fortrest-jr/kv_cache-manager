@@ -653,7 +653,7 @@ async function assignCharactersToSlots() {
     console.debug(`[KV Cache Manager] Персонажи распределены по слотам:`, currentSlots);
     
     // Загружаем кеш для всех персонажей, которые были распределены в слоты
-    await loadCacheForSlottedCharacters();
+    // await loadCacheForSlottedCharacters();
     
     // Обновляем UI
     updateSlotsList();

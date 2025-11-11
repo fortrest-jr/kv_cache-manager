@@ -4,9 +4,9 @@
 // Импортируем необходимые функции
 import { extension_settings, getContext } from "../../../extensions.js";
 import { saveSettingsDebounced, eventSource, event_types, getCurrentChatId, characters } from "../../../../script.js";
-import { textgen_types, textgenerationwebui_settings } from '../../../textgen-settings.js';
 import { getGroupMembers } from '../../../group-chats.js';
-import HttpClient from './http-client.js';
+import LlamaApi from './llama-api.js';
+import FilePluginApi from './file-plugin-api.js';
 
 // Имя расширения должно совпадать с именем папки
 const extensionName = "kv_cache-manager";
@@ -21,15 +21,13 @@ const defaultSettings = {
 
 const extensionSettings = extension_settings[extensionName] ||= {};
 
-// Инициализация HTTP-клиента
-const httpClient = new HttpClient();
+// Инициализация API клиентов
+const llamaApi = new LlamaApi();
+const filePluginApi = new FilePluginApi();
 
 // Константы
 const MIN_USAGE_FOR_SAVE = 2; // Минимальное количество использований слота для сохранения кеша перед вытеснением
 const MIN_FILE_SIZE_MB = 1; // Минимальный размер файла кеша в МБ (файлы меньше этого размера считаются невалидными)
-const SAVE_TIMEOUT_MS = 300000; // Таймаут для сохранения кеша (5 минут)
-const LOAD_TIMEOUT_MS = 300000; // Таймаут для загрузки кеша (5 минут)
-const CLEAR_TIMEOUT_MS = 30000; // Таймаут для очистки кеша (30 секунд)
 const FILE_CHECK_DELAY_MS = 500; // Задержка перед проверкой размера файла после сохранения (мс)
 
 // Счетчик сообщений для каждого персонажа в каждом чата (для автосохранения)
@@ -268,14 +266,6 @@ function onShowNotificationsChange(event) {
 }
 
 
-// Получение URL llama.cpp сервера
-function getLlamaUrl() {
-    const provided_url = textgenerationwebui_settings.server_urls[textgen_types.LLAMACPP]
-    console.debug('LlamaCpp server URL: ' + provided_url);
-    return provided_url;
-}
-
-
 // Получение количества слотов из ответа /slots
 function getSlotsCountFromData(slotsData) {
     if (Array.isArray(slotsData)) {
@@ -438,11 +428,8 @@ function parseSaveFilename(filename) {
 
 // Получение информации о всех слотах через /slots
 async function getAllSlotsInfo() {
-    const llamaUrl = getLlamaUrl();
-    const url = `${llamaUrl}slots`;
-    
     try {
-        const slotsData = await httpClient.get(url);
+        const slotsData = await llamaApi.getSlots();
         return slotsData;
     } catch (e) {
         console.debug('[KV Cache Manager] Ошибка получения информации о слотах:', e);
@@ -690,15 +677,10 @@ async function updateSlotsList() {
 // @param {string} filename - Имя файла для сохранения
 // @param {string} characterName - Имя персонажа (обязательно)
 async function saveSlotCache(slotId, filename, characterName) {
-    const llamaUrl = getLlamaUrl();
-    const url = `${llamaUrl}slots/${slotId}?action=save`;
-    
     console.debug(`[KV Cache Manager] Сохранение кеша: слот=${slotId}, filename=${filename}`);
     
     try {
-        await httpClient.post(url, { filename: filename }, {
-            timeout: SAVE_TIMEOUT_MS
-        });
+        await llamaApi.saveSlotCache(slotId, filename);
         
         console.debug(`[KV Cache Manager] Кеш успешно сохранен для слота ${slotId}`);
         
@@ -743,15 +725,10 @@ async function saveSlotCache(slotId, filename, characterName) {
 
 // Загрузка кеша для слота
 async function loadSlotCache(slotId, filename) {
-    const llamaUrl = getLlamaUrl();
-    const url = `${llamaUrl}slots/${slotId}?action=restore`;
-    
     console.debug(`[KV Cache Manager] Загрузка кеша: слот ${slotId}, файл ${filename}`);
     
     try {
-        await httpClient.post(url, { filename: filename }, {
-            timeout: LOAD_TIMEOUT_MS
-        });
+        await llamaApi.loadSlotCache(slotId, filename);
         
         // При любой загрузке кеша сбрасываем счетчик использования в 0 и помечаем кеш как загруженный
         if (slotId !== null && slotId !== undefined && slotsState[slotId]) {
@@ -769,15 +746,10 @@ async function loadSlotCache(slotId, filename) {
 
 // Очистка кеша для слота
 async function clearSlotCache(slotId) {
-    const llamaUrl = getLlamaUrl();
-    const url = `${llamaUrl}slots/${slotId}?action=erase`;
-    
     console.debug(`[KV Cache Manager] Очистка кеша слота ${slotId}`);
     
     try {
-        await httpClient.post(url, null, {
-            timeout: CLEAR_TIMEOUT_MS
-        });
+        await llamaApi.clearSlotCache(slotId);
         
         console.debug(`[KV Cache Manager] Кеш успешно очищен для слота ${slotId}`);
         return true;
@@ -856,7 +828,7 @@ async function clearAllSlotsCache() {
 async function getFilesList() {
     try {
         // Обращаемся к API плагина для получения списка файлов
-        const data = await httpClient.get('/api/plugins/kv-cache-manager/files');
+        const data = await filePluginApi.getFilesList();
         
         if (data) {
             // Фильтруем только .bin файлы и не директории
@@ -983,45 +955,9 @@ async function onSaveNowButtonClick() {
     }
 }
 
-// Получение CSRF токена (кэшируется)
-let csrfTokenCache = null;
-
-async function getCsrfToken() {
-    if (csrfTokenCache) {
-        return csrfTokenCache;
-    }
-    
-    try {
-        const response = await httpClient.get('/csrf-token', {
-            timeout: 5000
-        });
-        
-        if (response && response.token) {
-            csrfTokenCache = response.token;
-            return csrfTokenCache;
-        }
-    } catch (e) {
-        console.warn('[KV Cache Manager] Не удалось получить CSRF токен:', e);
-    }
-    
-    return null;
-}
-
 async function deleteFile(filename) {
-    const url = `/api/plugins/kv-cache-manager/files/${filename}`;
-    const csrfToken = await getCsrfToken();
-    
-    const headers = {};
-    if (csrfToken) {
-        headers['X-CSRF-Token'] = csrfToken;
-    }
-    
     try {
-        await httpClient.delete(url, {
-            timeout: 10000,
-            headers: headers,
-            credentials: 'same-origin'
-        });
+        await filePluginApi.deleteFile(filename);
         
         console.debug(`[KV Cache Manager] Файл удален: ${filename}`);
         return true;

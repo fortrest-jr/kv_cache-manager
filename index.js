@@ -16,7 +16,8 @@ const defaultSettings = {
     enabled: true,
     saveInterval: 5,
     maxFiles: 10,
-    showNotifications: true
+    showNotifications: true,
+    clearOnChatChange: true
 };
 
 const extensionSettings = extension_settings[extensionName] ||= {};
@@ -36,6 +37,7 @@ const messageCounters = {};
 
 let currentSlot = null;
 let slotsState = [];
+let previousChatId = null; // Хранит предыдущий chatId для проверки изменения чата
 
 // Обновление индикатора следующего сохранения
 // Показывает минимальное оставшееся количество сообщений среди всех персонажей
@@ -201,6 +203,7 @@ async function loadSettings() {
     $("#kv-cache-save-interval").val(extensionSettings.saveInterval).trigger("input");
     $("#kv-cache-max-files").val(extensionSettings.maxFiles).trigger("input");
     $("#kv-cache-show-notifications").prop("checked", extensionSettings.showNotifications).trigger("input");
+    $("#kv-cache-clear-on-chat-change").prop("checked", extensionSettings.clearOnChatChange).trigger("input");
     
     // Обновляем индикатор следующего сохранения
     updateNextSaveIndicator();
@@ -263,6 +266,13 @@ function onShowNotificationsChange(event) {
     extensionSettings.showNotifications = value;
     saveSettingsDebounced();
     showToast('success', `Уведомления ${value ? 'включены' : 'отключены'}`);
+}
+
+function onClearOnChatChangeChange(event) {
+    const value = Boolean($(event.target).prop("checked"));
+    extensionSettings.clearOnChatChange = value;
+    saveSettingsDebounced();
+    showToast('success', `Очистка при смене чата ${value ? 'включена' : 'отключена'}`);
 }
 
 
@@ -467,17 +477,9 @@ async function initializeSlots() {
     updateSlotsList();
 }
 
-// Распределение персонажей по слотам из текущего чата
-// Очищает старых персонажей из других чатов
-async function assignCharactersToSlots() {
-    // Убеждаемся, что слоты инициализированы
-    if (slotsState.length === 0) {
-        await initializeSlots();
-    }
-    
-    // Получаем персонажей текущего чата
-    const chatCharacters = await getChatCharacters();
-    
+// Сохранение кеша для всех персонажей, которые находятся в слотах
+// Используется перед очисткой слотов при смене чата
+async function saveAllSlotsCache() {
     const totalSlots = slotsState.length;
     
     // Сохраняем кеш для всех персонажей, которые были в слотах перед очисткой
@@ -496,8 +498,22 @@ async function assignCharactersToSlots() {
             }
         }
     }
+}
+
+// Распределение персонажей по слотам из текущего чата
+// Очищает старых персонажей из других чатов
+async function assignCharactersToSlots() {
+    // Убеждаемся, что слоты инициализированы
+    if (slotsState.length === 0) {
+        await initializeSlots();
+    }
     
-    // Полностью очищаем все слоты только после завершения всех сохранений
+    // Получаем персонажей текущего чата
+    const chatCharacters = await getChatCharacters();
+    
+    const totalSlots = slotsState.length;
+    
+    // Полностью очищаем все слоты (сохранение должно было произойти до вызова этой функции)
     for (let i = 0; i < totalSlots; i++) {
         slotsState[i] = createEmptySlot();
     }
@@ -1703,6 +1719,10 @@ jQuery(async () => {
     if (!messageCounters[initialChatId]) {
         messageCounters[initialChatId] = 0;
     }
+    
+    // Инициализируем previousChatId для отслеживания смены чата
+    previousChatId = getCurrentChatId();
+    
     updateNextSaveIndicator();
     
     // Обновляем список слотов при запуске генерации
@@ -1814,8 +1834,35 @@ jQuery(async () => {
     // Подписка на событие переключения чата для автозагрузки
     eventSource.on(event_types.CHAT_CHANGED, async () => {
         const currentChatId = getNormalizedChatId();
+        const previousChatIdNormalized = previousChatId ? normalizeChatId(previousChatId) : null;
         
-        // Очищаем все слоты перед переключением (всегда включено)
+        // Проверяем, изменилось ли имя чата (и не меняется ли оно с/на "unknown")
+        const chatIdChanged = previousChatIdNormalized !== null && 
+                              previousChatIdNormalized !== currentChatId &&
+                              previousChatIdNormalized !== 'unknown' && 
+                              currentChatId !== 'unknown';
+        
+        // Обновляем previousChatId для следующего события
+        previousChatId = getCurrentChatId();
+        
+        // Если имя чата не изменилось или меняется с/на unknown - не запускаем очистку
+        if (!chatIdChanged) {
+            console.debug(`[KV Cache Manager] Имя чата не изменилось (${previousChatIdNormalized} -> ${currentChatId}) или меняется с/на unknown, пропускаем очистку`);
+            return;
+        }
+        
+        // Проверяем настройку очистки при смене чата
+        if (!extensionSettings.clearOnChatChange) {
+            console.debug(`[KV Cache Manager] Очистка при смене чата отключена в настройках`);
+            return;
+        }
+        
+        console.debug(`[KV Cache Manager] Смена чата: ${previousChatIdNormalized} -> ${currentChatId}`);
+        
+        // ВАЖНО: Сначала сохраняем кеш для всех персонажей, которые были в слотах
+        await saveAllSlotsCache();
+        
+        // Затем очищаем все слоты на сервере
         await clearAllSlotsCache();
         
         // Распределяем персонажей по слотам (групповой режим всегда включен)
@@ -1832,6 +1879,7 @@ jQuery(async () => {
     $("#kv-cache-save-interval").on("input", onSaveIntervalChange);
     $("#kv-cache-max-files").on("input", onMaxFilesChange);
     $("#kv-cache-show-notifications").on("input", onShowNotificationsChange);
+    $("#kv-cache-clear-on-chat-change").on("input", onClearOnChatChangeChange);
     
     $("#kv-cache-save-button").on("click", onSaveButtonClick);
     $("#kv-cache-load-button").on("click", onLoadButtonClick);

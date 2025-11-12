@@ -1,52 +1,36 @@
-<!-- Модалка загрузки кеша -->
-<div id="kv-cache-load-modal" class="dialogue_popup" style="display: none;">
-    <div class="dialogue_popup_content">
-        <div class="dialogue_popup_header">
-            <h3>Загрузка кеша</h3>
-            <button class="dialogue_popup_close" id="kv-cache-load-modal-close">
-                <i class="fa-solid fa-times"></i>
-            </button>
+<!-- Контент модалки загрузки кеша для callGenericPopup -->
+<div id="kv-cache-load-modal-content">
+    <!-- Поиск -->
+    <div class="kv-cache-load-search">
+        <input type="text" id="kv-cache-load-search-input" class="text_pole" placeholder="Поиск по чату или имени..." />
+    </div>
+    
+    <div class="kv-cache-load-content">
+        <!-- Боковая панель с чатами -->
+        <div class="kv-cache-load-chats">
+            <div class="kv-cache-load-chat-item kv-cache-load-chat-item-current" data-chat-id="current">
+                <div class="kv-cache-load-chat-name">
+                    <i class="fa-solid fa-comments"></i>
+                    <span class="kv-cache-load-chat-name-text">Текущий чат</span>
+                </div>
+                <div class="kv-cache-load-chat-count">-</div>
+            </div>
+            <div id="kv-cache-load-chats-list"></div>
         </div>
-        <div class="dialogue_popup_body">
-            <!-- Поиск -->
-            <div class="kv-cache-load-search">
-                <input type="text" id="kv-cache-load-search-input" class="text_pole" placeholder="Поиск по чату или имени..." />
-            </div>
-            
-            <div class="kv-cache-load-content">
-                <!-- Боковая панель с чатами -->
-                <div class="kv-cache-load-chats">
-                    <div class="kv-cache-load-chat-item kv-cache-load-chat-item-current" data-chat-id="current">
-                        <div class="kv-cache-load-chat-name">
-                            <i class="fa-solid fa-comments"></i>
-                            <span class="kv-cache-load-chat-name-text">Текущий чат</span>
-                        </div>
-                        <div class="kv-cache-load-chat-count">-</div>
-                    </div>
-                    <div id="kv-cache-load-chats-list"></div>
-                </div>
-                
-                <!-- Основная область с файлами -->
-                <div class="kv-cache-load-files">
-                    <div id="kv-cache-load-files-list">
-                        <p class="kv-cache-load-empty">
-                            Выберите чат для просмотра файлов
-                        </p>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Кнопки действий -->
-            <div class="dialogue_popup_footer">
-                <div id="kv-cache-load-selected-info">
-                    Файл не выбран
-                </div>
-                <div>
-                    <button id="kv-cache-load-confirm-button" class="menu_button" disabled>Загрузить</button>
-                    <button id="kv-cache-load-cancel-button" class="menu_button">Отмена</button>
-                </div>
+        
+        <!-- Основная область с файлами -->
+        <div class="kv-cache-load-files">
+            <div id="kv-cache-load-files-list">
+                <p class="kv-cache-load-empty">
+                    Загрузка файлов...
+                </p>
             </div>
         </div>
+    </div>
+    
+    <!-- Информация о выбранных персонажах -->
+    <div id="kv-cache-load-selected-info">
+        Персонажи не выбраны
     </div>
 </div>
 

@@ -6,7 +6,8 @@ import { getFilesList, parseSaveFilename } from './file-manager.js';
 import { getSlotsState, acquireSlot, updateSlotsList } from './slot-manager.js';
 import { loadSlotCache, saveCharacterCache } from './cache-operations.js';
 import { showToast } from './ui.js';
-import { getExtensionSettings } from './settings.js';
+import { getExtensionSettings, extensionFolderPath } from './settings.js';
+import { callGenericPopup, POPUP_TYPE, POPUP_RESULT } from '../../../../scripts/popup.js';
 
 // Глобальные переменные для модалки загрузки
 // Новая структура: { [chatId]: { [characterName]: [{ timestamp, filename, tag }, ...] } }
@@ -59,19 +60,34 @@ export function groupFilesByChatAndCharacter(files) {
     return chats;
 }
 
+// Настройка обработчиков событий для модалки
+function setupLoadModalHandlers() {
+    // Обработчик для текущего чата
+    $(document).off('click', '.kv-cache-load-chat-item-current').on('click', '.kv-cache-load-chat-item-current', function() {
+        selectLoadModalChat('current');
+    });
+    
+    // Обработчик для других чатов (делегирование)
+    $(document).off('click', '.kv-cache-load-chat-item:not(.kv-cache-load-chat-item-current)').on('click', '.kv-cache-load-chat-item:not(.kv-cache-load-chat-item-current)', function() {
+        const chatId = $(this).data('chat-id');
+        if (chatId) {
+            selectLoadModalChat(chatId);
+        }
+    });
+    
+    // Обработчик поиска
+    $(document).off('input', '#kv-cache-load-search-input').on('input', '#kv-cache-load-search-input', function() {
+        const query = $(this).val();
+        updateSearchQuery(query);
+    });
+}
+
 // Открытие модалки загрузки
 export async function openLoadModal() {
-    const modal = $("#kv-cache-load-modal");
-    modal.css('display', 'flex');
-    
-    // Показываем загрузку
-    $("#kv-cache-load-files-list").html('<div class="kv-cache-load-loading"><i class="fa-solid fa-spinner"></i> Загрузка файлов...</div>');
-    
     // Получаем список файлов
     const filesList = await getFilesList();
     
     if (!filesList || filesList.length === 0) {
-        $("#kv-cache-load-files-list").html('<div class="kv-cache-load-empty">Не найдено сохранений для загрузки. Сначала сохраните кеш.</div>');
         showToast('warning', 'Не найдено сохранений для загрузки');
         return;
     }
@@ -82,21 +98,120 @@ export async function openLoadModal() {
     loadModalData.currentChatId = getNormalizedChatId();
     loadModalData.selectedChatId = null; // Сбрасываем выбранный чат
     loadModalData.selectedCharacters = {};
+    loadModalData.searchQuery = '';
     
-    // Отображаем чаты и файлы
-    renderLoadModalChats();
-    selectLoadModalChat('current');
+    // Загружаем HTML-контент из файла
+    const modalHTML = await $.get(`${extensionFolderPath}/load-modal.html`);
+    
+    // Флаг для отслеживания, была ли выполнена загрузка
+    let loadPerformed = false;
+    
+    // Функция для выполнения загрузки
+    const performLoad = async () => {
+        if (Object.keys(loadModalData.selectedCharacters).length === 0) {
+            showToast('error', 'Персонажи не выбраны');
+            return false;
+        }
+        
+        loadPerformed = true;
+        await loadSelectedCache();
+        return true;
+    };
+    
+    // Вызываем callGenericPopup
+    const popupPromise = callGenericPopup(
+        modalHTML,
+        POPUP_TYPE.TEXT,
+        '',
+        {
+            large: true,
+            allowVerticalScrolling: true,
+            customButtons: [
+                { text: 'Загрузить', result: 'load' },
+                { text: 'Отмена', result: POPUP_RESULT.NEGATIVE }
+            ]
+        }
+    );
+    
+    // Настраиваем обработчики после открытия модалки
+    // Используем MutationObserver для отслеживания появления модалки в DOM
+    const observer = new MutationObserver((mutations, obs) => {
+        const modalContent = $('#kv-cache-load-modal-content');
+        if (modalContent.length > 0) {
+            obs.disconnect();
+            
+            setupLoadModalHandlers();
+            
+            // Отображаем чаты и файлы
+            renderLoadModalChats();
+            selectLoadModalChat('current');
+            
+            // Изначально отключаем кнопку "Загрузить"
+            const loadButton = $('[data-popup-button-result="load"]');
+            if (loadButton.length) {
+                loadButton.prop('disabled', true);
+            }
+            
+            // Обработчик для кнопки "Загрузить" через делегирование
+            $(document).off('click', '[data-popup-button-result="load"]').on('click', '[data-popup-button-result="load"]', async function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const button = $(this);
+                if (button.prop('disabled')) {
+                    return;
+                }
+                
+                await performLoad();
+                
+                // Закрываем модалку программно после загрузки
+                if (loadPerformed) {
+                    // Ищем модалку и закрываем её
+                    const popup = button.closest('.dialogue_popup');
+                    if (popup.length) {
+                        // Используем стандартный способ закрытия через кнопку отмены
+                        const cancelButton = popup.find(`[data-popup-button-result="${POPUP_RESULT.NEGATIVE}"]`);
+                        if (cancelButton.length) {
+                            cancelButton.trigger('click');
+                        } else {
+                            // Fallback - закрываем через кнопку закрытия
+                            const closeBtn = popup.find('.dialogue_popup_close');
+                            if (closeBtn.length) {
+                                closeBtn.trigger('click');
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    });
+    
+    // Начинаем наблюдение за изменениями в DOM
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+    
+    // Очищаем observer через 5 секунд, если модалка не появилась
+    setTimeout(() => observer.disconnect(), 5000);
+    
+    // Ждём результат модалки
+    const result = await popupPromise;
+    
+    // Отключаем observer после закрытия модалки
+    observer.disconnect();
+    
+    // Если результат - загрузка и она ещё не была выполнена, выполняем её
+    if (result === 'load' && !loadPerformed) {
+        await performLoad();
+    }
 }
 
-// Закрытие модалки загрузки
+// Закрытие модалки загрузки (больше не используется, оставлено для совместимости)
 export function closeLoadModal() {
-    const modal = $("#kv-cache-load-modal");
-    modal.css('display', 'none');
+    // Модалка теперь закрывается через callGenericPopup
     loadModalData.selectedCharacters = {};
     loadModalData.searchQuery = '';
-    $("#kv-cache-load-search-input").val('');
-    $("#kv-cache-load-confirm-button").prop('disabled', true);
-    $("#kv-cache-load-selected-info").text('Персонажи не выбраны');
 }
 
 // Отображение списка чатов
@@ -305,14 +420,27 @@ export function renderLoadModalFiles(chatId) {
 // Обновление информации о выбранных персонажах
 export function updateLoadModalSelection() {
     const selectedCount = Object.keys(loadModalData.selectedCharacters).length;
+    const selectedInfo = $("#kv-cache-load-selected-info");
+    
+    if (selectedInfo.length === 0) {
+        return; // Модалка не открыта
+    }
     
     if (selectedCount === 0) {
-        $("#kv-cache-load-confirm-button").prop('disabled', true);
-        $("#kv-cache-load-selected-info").text('Персонажи не выбраны');
+        selectedInfo.text('Персонажи не выбраны');
+        // Отключаем кнопку "Загрузить" если она есть
+        const loadButton = $('[data-popup-button-result="load"]');
+        if (loadButton.length) {
+            loadButton.prop('disabled', true);
+        }
     } else {
-        $("#kv-cache-load-confirm-button").prop('disabled', false);
         const charactersList = Object.keys(loadModalData.selectedCharacters).join(', ');
-        $("#kv-cache-load-selected-info").html(`<strong>Выбрано:</strong> ${selectedCount} персонаж${selectedCount !== 1 ? 'ей' : ''} (${charactersList})`);
+        selectedInfo.html(`<strong>Выбрано:</strong> ${selectedCount} персонаж${selectedCount !== 1 ? 'ей' : ''} (${charactersList})`);
+        // Включаем кнопку "Загрузить"
+        const loadButton = $('[data-popup-button-result="load"]');
+        if (loadButton.length) {
+            loadButton.prop('disabled', false);
+        }
     }
 }
 
@@ -409,8 +537,6 @@ export async function loadSelectedCache() {
     const selectedChatId = loadModalData.selectedChatId || loadModalData.currentChatId || getNormalizedChatId();
     const chats = loadModalData.chats;
     const chatCharacters = chats[selectedChatId] || {};
-    
-    closeLoadModal();
     
     let loadedCount = 0;
     let errors = [];

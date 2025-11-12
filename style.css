@@ -89,7 +89,6 @@
 }
 
 /* Стили для модалки загрузки */
-#kv-cache-load-modal,
 #kv-cache-auto-load-confirm-modal {
     z-index: 10000;
     position: fixed;
@@ -104,16 +103,10 @@
     justify-content: center;
 }
 
-#kv-cache-load-modal .dialogue_popup_content,
 #kv-cache-auto-load-confirm-modal .dialogue_popup_content {
-    max-width: 90vw;
-    width: 1000px;
-    max-height: 90vh;
-}
-
-#kv-cache-auto-load-confirm-modal .dialogue_popup_content {
-    width: 500px;
     max-width: 95vw;
+    width: 500px;
+    max-height: 90vh;
     background: var(--SmartThemeBlurTintColor, #1a1a1a);
     border-radius: 8px;
 }
@@ -167,10 +160,10 @@
     padding: 20px 0;
 }
 
-#kv-cache-load-modal .dialogue_popup_body {
-    display: flex;
-    flex-direction: column;
-    height: calc(90vh - 100px);
+/* Стили для элементов внутри модалки загрузки (теперь используется callGenericPopup) */
+#kv-cache-load-modal-content {
+    min-width: 300px;
+    max-width: 100%;
 }
 
 .kv-cache-load-search {
@@ -179,36 +172,19 @@
 
 /* Поле поиска использует стили text_pole из SillyTavern */
 
-/* Стили для кнопки закрытия модалки */
-#kv-cache-load-modal .dialogue_popup_close {
-    background: transparent;
-    border: none;
-    color: var(--SmartThemeBodyColor);
-    cursor: pointer;
-    padding: 5px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-#kv-cache-load-modal .dialogue_popup_close:hover {
-    opacity: 0.7;
-}
-
-#kv-cache-load-modal .dialogue_popup_close i {
-    font-size: 1.2em;
-}
-
 .kv-cache-load-content {
     display: flex;
     flex: 1;
     gap: 15px;
     overflow: hidden;
     flex-direction: row;
+    min-height: 400px;
+    max-height: 60vh;
 }
 
 .kv-cache-load-chats {
     width: 250px;
+    min-width: 200px;
     border-right: 1px solid var(--SmartThemeBorderColor);
     overflow-y: auto;
     padding-right: 10px;
@@ -227,20 +203,9 @@
 
 #kv-cache-load-selected-info {
     color: var(--SmartThemeBodyColor);
-}
-
-#kv-cache-load-modal .dialogue_popup_footer {
     margin-top: 15px;
     padding-top: 15px;
     border-top: 1px solid var(--SmartThemeBorderColor);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-#kv-cache-load-modal .dialogue_popup_footer > div:last-child {
-    display: flex;
-    gap: 10px;
 }
 
 .kv-cache-load-chat-item {
@@ -428,11 +393,6 @@
 
 /* Планшеты */
 @media (min-width: 769px) and (max-width: 1024px) {
-    #kv-cache-load-modal .dialogue_popup_content {
-        width: 95vw;
-        max-width: 95vw;
-    }
-    
     .kv-cache-load-chats {
         width: 200px;
     }
@@ -449,26 +409,21 @@
 
 /* Адаптивность для мобильных устройств */
 @media (max-width: 768px) {
-    #kv-cache-load-modal .dialogue_popup_content {
-        width: 100vw;
-        max-width: 100vw;
-        max-height: 100vh;
-        margin: 0;
-        border-radius: 0;
-    }
-    
-    #kv-cache-load-modal .dialogue_popup_body {
-        height: calc(100vh - 120px);
+    #kv-cache-load-modal-content {
+        min-width: 100%;
+        max-width: 100%;
     }
     
     /* Вертикальная раскладка на мобильных */
     .kv-cache-load-content {
         flex-direction: column;
         gap: 10px;
+        max-height: 50vh;
     }
     
     .kv-cache-load-chats {
         width: 100%;
+        min-width: 100%;
         border-right: none;
         border-bottom: 1px solid var(--SmartThemeBorderColor);
         max-height: 220px;
@@ -497,33 +452,6 @@
     .kv-cache-load-file-group-header {
         padding: 14px;
         min-height: 52px;
-    }
-    
-    /* Адаптируем футер */
-    .dialogue_popup_footer {
-        flex-direction: column;
-        gap: 12px;
-        align-items: stretch;
-    }
-    
-    .dialogue_popup_footer > div:first-child {
-        text-align: center;
-        margin-bottom: 0;
-        font-size: 0.9em;
-    }
-    
-    .dialogue_popup_footer > div:last-child {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        width: 100%;
-    }
-    
-    .dialogue_popup_footer .menu_button {
-        width: 100%;
-        padding: 14px;
-        font-size: 16px; /* Предотвращает zoom на iOS */
-        min-height: 48px;
     }
     
     /* Улучшаем поиск */

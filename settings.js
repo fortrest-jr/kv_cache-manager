@@ -7,7 +7,8 @@ import { updateNextSaveIndicator } from './auto-save.js';
 import { updateSlotsList } from './slot-manager.js';
 
 // Имя расширения должно совпадать с именем папки
-const extensionName = "kv_cache-manager";
+export const extensionName = "kv_cache-manager";
+export const extensionFolderPath = `scripts/extensions/third-party/${extensionName}`;
 
 export const defaultSettings = {
     enabled: true,

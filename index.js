@@ -2,24 +2,18 @@
 // Расширение для управления KV-кешем llama.cpp
 import { eventSource, event_types } from "../../../../script.js";
 
-import { loadSettings, createSettingsHandlers } from './settings.js';
+import { loadSettings, createSettingsHandlers, extensionFolderPath } from './settings.js';
 import { onSaveButtonClick, onSaveNowButtonClick, onLoadButtonClick, onReleaseAllSlotsButtonClick, onSaveSlotButtonClick } from './ui.js';
 import { initializeSlots, updateSlotsList, redistributeCharacters, initializePreviousChatId } from './slot-manager.js';
 import { updateNextSaveIndicator, processMessageForAutoSave } from './auto-save.js';
-import { closeLoadModal, selectLoadModalChat, loadSelectedCache, updateSearchQuery } from './load-modal.js';
+// Импорты из load-modal.js больше не нужны для index.js, так как модалка теперь управляется через callGenericPopup
 import { KVCacheManagerInterceptor, setSlotForGeneration } from './generation-interceptor.js';
-
-// Имя расширения должно совпадать с именем папки
-const extensionName = "kv_cache-manager";
-const extensionFolderPath = `scripts/extensions/third-party/${extensionName}`;
 
 // Функция вызывается при загрузке расширения
 jQuery(async () => {
     // Загружаем HTML из файлов
     const settingsHtml = await $.get(`${extensionFolderPath}/settings.html`);
     $("#extensions_settings").append(settingsHtml);
-    const loadModalHtml = await $.get(`${extensionFolderPath}/load-modal.html`);
-    $("body").append(loadModalHtml);
 
     // Загружаем настройки при старте
     await loadSettings();
@@ -58,35 +52,5 @@ jQuery(async () => {
     
     // Обработчик для кнопок сохранения слотов (делегирование для динамических элементов)
     $(document).on("click", ".kv-cache-save-slot-button", onSaveSlotButtonClick);
-    
-    // Обработчики для модалки загрузки (используем делегирование для динамических элементов)
-    $(document).on("click", "#kv-cache-load-modal-close", closeLoadModal);
-    $(document).on("click", "#kv-cache-load-cancel-button", closeLoadModal);
-    $(document).on("click", "#kv-cache-load-confirm-button", loadSelectedCache);
-    
-    // Обработчик для текущего чата (делегирование)
-    $(document).on("click", ".kv-cache-load-chat-item-current", function() {
-        selectLoadModalChat('current');
-    });
-    
-    // Обработчик поиска
-    $(document).on("input", "#kv-cache-load-search-input", function() {
-        const query = $(this).val();
-        updateSearchQuery(query);
-    });
-    
-    // Закрытие модалки по клику вне её области
-    $(document).on("click", "#kv-cache-load-modal", function(e) {
-        if ($(e.target).is("#kv-cache-load-modal")) {
-            closeLoadModal();
-        }
-    });
-    
-    // Закрытие модалки по Escape
-    $(document).on("keydown", function(e) {
-        if (e.key === "Escape" && $("#kv-cache-load-modal").is(":visible")) {
-            closeLoadModal();
-        }
-    });
     
 });

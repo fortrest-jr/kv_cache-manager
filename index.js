@@ -664,8 +664,19 @@ async function updateSlotsList() {
                 usedCount++;
             }
             
-            html += `<li style="margin: 3px 0;">`;
-            html += `Слот <strong>${i}</strong>: `;
+            html += `<li style="margin: 3px 0; display: flex; align-items: center; gap: 5px;">`;
+            
+            // Кнопка сохранения (только для занятых слотов)
+            if (isUsed) {
+                html += `<button class="kv-cache-save-slot-button" data-slot-index="${i}" data-character-name="${characterName}" style="background: none; border: none; cursor: pointer; padding: 2px 4px; display: inline-flex; align-items: center; color: var(--SmartThemeBodyColor, #888);" title="Сохранить кеш для ${characterName}">`;
+                html += `<i class="fa-solid fa-floppy-disk" style="font-size: 0.85em;"></i>`;
+                html += `</button>`;
+            } else {
+                // Пустое место для выравнивания, если слот свободен
+                html += `<span style="width: 20px; display: inline-block;"></span>`;
+            }
+            
+            html += `<span>Слот <strong>${i}</strong>: `;
             
             if (isUsed) {
                 html += `<span style="color: var(--SmartThemeBodyColor, inherit);">${characterName}</span> `;
@@ -674,7 +685,7 @@ async function updateSlotsList() {
                 html += `<span style="color: #888; font-style: italic;">(свободен)</span>`;
             }
             
-            html += `</li>`;
+            html += `</span></li>`;
         }
         
         html += '</ul>';
@@ -968,6 +979,48 @@ async function onSaveNowButtonClick() {
             }
         }
         updateNextSaveIndicator();
+    }
+}
+
+// Сохранение кеша для конкретного слота
+async function onSaveSlotButtonClick(event) {
+    const button = $(event.target).closest('.kv-cache-save-slot-button');
+    const slotIndex = parseInt(button.data('slot-index'));
+    const characterName = button.data('character-name');
+    
+    if (isNaN(slotIndex) || !characterName) {
+        showToast('error', 'Ошибка: неверные данные слота', 'Сохранение слота');
+        return;
+    }
+    
+    // Проверяем, что слот действительно занят этим персонажем
+    const slot = slotsState[slotIndex];
+    if (!slot || !slot.characterName || normalizeCharacterName(slot.characterName) !== normalizeCharacterName(characterName)) {
+        showToast('error', 'Персонаж не найден в этом слоте', 'Сохранение слота');
+        return;
+    }
+    
+    // Временно отключаем кнопку
+    button.prop('disabled', true);
+    const originalTitle = button.attr('title');
+    button.attr('title', 'Сохранение...');
+    
+    try {
+        showToast('info', `Сохранение кеша для ${characterName}...`, 'Сохранение слота');
+        const success = await saveCharacterCache(characterName, slotIndex);
+        
+        if (success) {
+            showToast('success', `Кеш для ${characterName} успешно сохранен`, 'Сохранение слота');
+        } else {
+            showToast('error', `Не удалось сохранить кеш для ${characterName}`, 'Сохранение слота');
+        }
+    } catch (e) {
+        console.error(`[KV Cache Manager] Ошибка при сохранении слота ${slotIndex}:`, e);
+        showToast('error', `Ошибка при сохранении: ${e.message}`, 'Сохранение слота');
+    } finally {
+        // Включаем кнопку обратно
+        button.prop('disabled', false);
+        button.attr('title', originalTitle);
     }
 }
 
@@ -1907,6 +1960,9 @@ jQuery(async () => {
     $("#kv-cache-save-now-button").on("click", onSaveNowButtonClick);
     $("#kv-cache-preload-characters-button").on("click", onPreloadCharactersButtonClick);
     $("#kv-cache-release-all-slots-button").on("click", onReleaseAllSlotsButtonClick);
+    
+    // Обработчик для кнопок сохранения слотов (делегирование для динамических элементов)
+    $(document).on("click", ".kv-cache-save-slot-button", onSaveSlotButtonClick);
     
     // Обработчики для модалки загрузки (используем делегирование для динамических элементов)
     $(document).on("click", "#kv-cache-load-modal-close", closeLoadModal);

@@ -141,6 +141,7 @@ export async function openLoadPopup() {
             large: true,
             allowVerticalScrolling: true,
             okButton: 'Загрузить', // Используем стандартную кнопку OK с текстом "Загрузить"
+            cancelButton: true, // Показываем стандартную кнопку Cancel
             // Инициализация после открытия popup
             onOpen: async (popup) => {
                 // Сохраняем ссылку на popup для использования в других функциях

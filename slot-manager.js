@@ -3,7 +3,7 @@
 import { getContext } from "../../../extensions.js";
 import { getGroupMembers } from '../../../group-chats.js';
 import LlamaApi from './llama-api.js';
-import { normalizeCharacterName, getSlotsCountFromData, getNormalizedChatId } from './utils.js';
+import { normalizeCharacterName, getNormalizedChatId } from './utils.js';
 import { showToast } from './ui.js';
 import { saveCharacterCache, saveAllSlotsCache, clearAllSlotsCache } from './cache-operations.js';
 import { getExtensionSettings } from './settings.js';
@@ -20,6 +20,16 @@ let previousChatId = 'unknown';
 // Получение состояния слотов
 export function getSlotsState() {
     return slotsState;
+}
+
+// Получение количества слотов из ответа /slots
+export function getSlotsCountFromData(slotsData) {
+    if (Array.isArray(slotsData)) {
+        return slotsData.length;
+    } else if (typeof slotsData === 'object' && slotsData !== null) {
+        return Object.keys(slotsData).length;
+    }
+    return 0;
 }
 
 // Получение информации о всех слотах через /slots

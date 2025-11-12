@@ -2,16 +2,6 @@
 
 import { getCurrentChatId } from "../../../../script.js";
 
-// Получение количества слотов из ответа /slots
-export function getSlotsCountFromData(slotsData) {
-    if (Array.isArray(slotsData)) {
-        return slotsData.length;
-    } else if (typeof slotsData === 'object' && slotsData !== null) {
-        return Object.keys(slotsData).length;
-    }
-    return 0;
-}
-
 // Формирование timestamp для имени файла (YYYYMMDDHHMMSS)
 export function formatTimestamp(date = new Date()) {
     const year = date.getFullYear();

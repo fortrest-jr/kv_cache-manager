@@ -161,7 +161,7 @@
 }
 
 /* Стили для элементов внутри модалки загрузки (теперь используется callGenericPopup) */
-#kv-cache-load-modal-content {
+#kv-cache-load-popup-content {
     min-width: 300px;
     max-width: 100%;
 }
@@ -409,7 +409,7 @@
 
 /* Адаптивность для мобильных устройств */
 @media (max-width: 768px) {
-    #kv-cache-load-modal-content {
+    #kv-cache-load-popup-content {
         min-width: 100%;
         max-width: 100%;
     }

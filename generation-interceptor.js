@@ -4,7 +4,7 @@ import { getContext } from "../../../extensions.js";
 import { normalizeCharacterName, formatTimestampToDate } from './utils.js';
 import { getSlotsState, acquireSlot, incrementSlotUsage } from './slot-manager.js';
 import { loadSlotCache } from './cache-operations.js';
-import { getLastCacheForCharacter } from './load-modal.js';
+import { getLastCacheForCharacter } from './load-popup.js';
 import { parseSaveFilename } from './file-manager.js';
 import { showToast } from './ui.js';
 

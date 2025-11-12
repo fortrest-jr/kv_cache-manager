@@ -1,4 +1,4 @@
-// Модальное окно загрузки для KV Cache Manager
+// Popup загрузки для KV Cache Manager
 
 import { getNormalizedChatId, normalizeCharacterName, formatTimestampToDate, parseFilesList, sortByTimestamp } from './utils.js';
 import { getCurrentChatId } from "../../../../script.js";
@@ -9,12 +9,15 @@ import { showToast } from './ui.js';
 import { getExtensionSettings, extensionFolderPath } from './settings.js';
 import { callGenericPopup, POPUP_TYPE, POPUP_RESULT } from '../../../../scripts/popup.js';
 
-// Глобальные переменные для модалки загрузки
+// Константа для результата кнопки "Загрузить"
+const POPUP_RESULT_LOAD = 1001;
+
+// Глобальные переменные для popup загрузки
 // Новая структура: { [chatId]: { [characterName]: [{ timestamp, filename, tag }, ...] } }
-let loadModalData = {
+let loadPopupData = {
     chats: {}, // Структура: { [chatId]: { [characterName]: [{ timestamp, filename, tag }, ...] } }
     currentChatId: null, // ID текущего чата (для отображения)
-    selectedChatId: null, // ID выбранного чата в модалке (для загрузки)
+    selectedChatId: null, // ID выбранного чата в popup (для загрузки)
     selectedCharacters: {}, // { [characterName]: timestamp } - выбранные персонажи и их timestamp
     searchQuery: ''
 };
@@ -60,18 +63,18 @@ export function groupFilesByChatAndCharacter(files) {
     return chats;
 }
 
-// Настройка обработчиков событий для модалки
-function setupLoadModalHandlers() {
+// Настройка обработчиков событий для popup
+function setupLoadPopupHandlers() {
     // Обработчик для текущего чата
     $(document).off('click', '.kv-cache-load-chat-item-current').on('click', '.kv-cache-load-chat-item-current', function() {
-        selectLoadModalChat('current');
+        selectLoadPopupChat('current');
     });
     
     // Обработчик для других чатов (делегирование)
     $(document).off('click', '.kv-cache-load-chat-item:not(.kv-cache-load-chat-item-current)').on('click', '.kv-cache-load-chat-item:not(.kv-cache-load-chat-item-current)', function() {
         const chatId = $(this).data('chat-id');
         if (chatId) {
-            selectLoadModalChat(chatId);
+            selectLoadPopupChat(chatId);
         }
     });
     
@@ -82,8 +85,8 @@ function setupLoadModalHandlers() {
     });
 }
 
-// Открытие модалки загрузки
-export async function openLoadModal() {
+// Открытие popup загрузки
+export async function openLoadPopup() {
     // Получаем список файлов
     const filesList = await getFilesList();
     
@@ -93,22 +96,22 @@ export async function openLoadModal() {
     }
     
     // Группируем файлы по чатам и персонажам
-    loadModalData.chats = groupFilesByChatAndCharacter(filesList);
+    loadPopupData.chats = groupFilesByChatAndCharacter(filesList);
     // Получаем нормализованный chatId
-    loadModalData.currentChatId = getNormalizedChatId();
-    loadModalData.selectedChatId = null; // Сбрасываем выбранный чат
-    loadModalData.selectedCharacters = {};
-    loadModalData.searchQuery = '';
+    loadPopupData.currentChatId = getNormalizedChatId();
+    loadPopupData.selectedChatId = null; // Сбрасываем выбранный чат
+    loadPopupData.selectedCharacters = {};
+    loadPopupData.searchQuery = '';
     
     // Загружаем HTML-контент из файла
-    const modalHTML = await $.get(`${extensionFolderPath}/load-modal.html`);
+    const popupHTML = await $.get(`${extensionFolderPath}/load-popup.html`);
     
     // Флаг для отслеживания, была ли выполнена загрузка
     let loadPerformed = false;
     
     // Функция для выполнения загрузки
     const performLoad = async () => {
-        if (Object.keys(loadModalData.selectedCharacters).length === 0) {
+        if (Object.keys(loadPopupData.selectedCharacters).length === 0) {
             showToast('error', 'Персонажи не выбраны');
             return false;
         }
@@ -120,69 +123,50 @@ export async function openLoadModal() {
     
     // Вызываем callGenericPopup
     const popupPromise = callGenericPopup(
-        modalHTML,
+        popupHTML,
         POPUP_TYPE.TEXT,
         '',
         {
             large: true,
             allowVerticalScrolling: true,
             customButtons: [
-                { text: 'Загрузить', result: 'load' },
+                { text: 'Загрузить', result: POPUP_RESULT_LOAD },
                 { text: 'Отмена', result: POPUP_RESULT.NEGATIVE }
-            ]
+            ],
+            // Выполняем загрузку перед закрытием popup, если была нажата кнопка "Загрузить"
+            onClosing: async (popup) => {
+                if (popup.result === POPUP_RESULT_LOAD && !loadPerformed) {
+                    // Проверяем, что персонажи выбраны
+                    if (Object.keys(loadPopupData.selectedCharacters).length === 0) {
+                        showToast('error', 'Персонажи не выбраны');
+                        return false; // Отменяем закрытие popup
+                    }
+                    // Выполняем загрузку
+                    await performLoad();
+                }
+                return true; // Разрешаем закрытие popup
+            }
         }
     );
     
-    // Настраиваем обработчики после открытия модалки
-    // Используем MutationObserver для отслеживания появления модалки в DOM
+    // Настраиваем обработчики после открытия popup
+    // Используем MutationObserver для отслеживания появления popup в DOM
     const observer = new MutationObserver((mutations, obs) => {
-        const modalContent = $('#kv-cache-load-modal-content');
-        if (modalContent.length > 0) {
+        const popupContent = $('#kv-cache-load-popup-content');
+        if (popupContent.length > 0) {
             obs.disconnect();
             
-            setupLoadModalHandlers();
+            setupLoadPopupHandlers();
             
             // Отображаем чаты и файлы
-            renderLoadModalChats();
-            selectLoadModalChat('current');
+            renderLoadPopupChats();
+            selectLoadPopupChat('current');
             
             // Изначально отключаем кнопку "Загрузить"
-            const loadButton = $('[data-popup-button-result="load"]');
+            const loadButton = $(`[data-result="${POPUP_RESULT_LOAD}"]`);
             if (loadButton.length) {
                 loadButton.prop('disabled', true);
             }
-            
-            // Обработчик для кнопки "Загрузить" через делегирование
-            $(document).off('click', '[data-popup-button-result="load"]').on('click', '[data-popup-button-result="load"]', async function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                
-                const button = $(this);
-                if (button.prop('disabled')) {
-                    return;
-                }
-                
-                await performLoad();
-                
-                // Закрываем модалку программно после загрузки
-                if (loadPerformed) {
-                    // Ищем модалку и закрываем её
-                    const popup = button.closest('.dialogue_popup');
-                    if (popup.length) {
-                        // Используем стандартный способ закрытия через кнопку отмены
-                        const cancelButton = popup.find(`[data-popup-button-result="${POPUP_RESULT.NEGATIVE}"]`);
-                        if (cancelButton.length) {
-                            cancelButton.trigger('click');
-                        } else {
-                            // Fallback - закрываем через кнопку закрытия
-                            const closeBtn = popup.find('.dialogue_popup_close');
-                            if (closeBtn.length) {
-                                closeBtn.trigger('click');
-                            }
-                        }
-                    }
-                }
-            });
         }
     });
     
@@ -192,33 +176,28 @@ export async function openLoadModal() {
         subtree: true
     });
     
-    // Очищаем observer через 5 секунд, если модалка не появилась
+    // Очищаем observer через 5 секунд, если popup не появился
     setTimeout(() => observer.disconnect(), 5000);
     
-    // Ждём результат модалки
+    // Ждём результат popup
     const result = await popupPromise;
     
-    // Отключаем observer после закрытия модалки
+    // Отключаем observer после закрытия popup
     observer.disconnect();
-    
-    // Если результат - загрузка и она ещё не была выполнена, выполняем её
-    if (result === 'load' && !loadPerformed) {
-        await performLoad();
-    }
 }
 
-// Закрытие модалки загрузки (больше не используется, оставлено для совместимости)
-export function closeLoadModal() {
-    // Модалка теперь закрывается через callGenericPopup
-    loadModalData.selectedCharacters = {};
-    loadModalData.searchQuery = '';
+// Закрытие popup загрузки (больше не используется, оставлено для совместимости)
+export function closeLoadPopup() {
+    // Popup теперь закрывается через callGenericPopup
+    loadPopupData.selectedCharacters = {};
+    loadPopupData.searchQuery = '';
 }
 
 // Отображение списка чатов
-export function renderLoadModalChats() {
+export function renderLoadPopupChats() {
     const chatsList = $("#kv-cache-load-chats-list");
-    const currentChatId = loadModalData.currentChatId;
-    const chats = loadModalData.chats;
+    const currentChatId = loadPopupData.currentChatId;
+    const chats = loadPopupData.chats;
     
     // Обновляем ID и счетчик для текущего чата
     const currentChatCharacters = chats[currentChatId] || {};
@@ -229,7 +208,7 @@ export function renderLoadModalChats() {
     $(".kv-cache-load-chat-item-current .kv-cache-load-chat-count").text(currentCount > 0 ? currentCount : '-');
     
     // Фильтруем чаты по поисковому запросу
-    const searchQuery = loadModalData.searchQuery.toLowerCase();
+    const searchQuery = loadPopupData.searchQuery.toLowerCase();
     const filteredChats = Object.keys(chats).filter(chatId => {
         if (chatId === currentChatId) return true;
         if (searchQuery && !chatId.toLowerCase().includes(searchQuery)) return false;
@@ -256,42 +235,42 @@ export function renderLoadModalChats() {
             </div>
         `);
         
-        chatItem.on('click', () => selectLoadModalChat(chatId));
+        chatItem.on('click', () => selectLoadPopupChat(chatId));
         chatsList.append(chatItem);
     }
 }
 
-// Выбор чата в модалке
-export function selectLoadModalChat(chatId) {
+// Выбор чата в popup
+export function selectLoadPopupChat(chatId) {
     // Убираем активный класс со всех чатов
     $(".kv-cache-load-chat-item").removeClass('active');
     
     // Устанавливаем активный класс и сохраняем выбранный чат
     if (chatId === 'current') {
         $(".kv-cache-load-chat-item-current").addClass('active');
-        chatId = loadModalData.currentChatId;
+        chatId = loadPopupData.currentChatId;
     } else {
         $(`.kv-cache-load-chat-item[data-chat-id="${chatId}"]`).addClass('active');
     }
     
     // Сохраняем выбранный чат для использования при загрузке
-    loadModalData.selectedChatId = chatId;
+    loadPopupData.selectedChatId = chatId;
     
     // Отображаем персонажей выбранного чата
-    renderLoadModalFiles(chatId);
+    renderLoadPopupFiles(chatId);
     
     // Сбрасываем выбор
-    loadModalData.selectedCharacters = {};
+    loadPopupData.selectedCharacters = {};
     $("#kv-cache-load-confirm-button").prop('disabled', true);
     $("#kv-cache-load-selected-info").text('Персонажи не выбраны');
 }
 
 // Отображение персонажей выбранного чата
-export function renderLoadModalFiles(chatId) {
+export function renderLoadPopupFiles(chatId) {
     const filesList = $("#kv-cache-load-files-list");
-    const chats = loadModalData.chats;
+    const chats = loadPopupData.chats;
     const chatCharacters = chats[chatId] || {};
-    const searchQuery = loadModalData.searchQuery.toLowerCase();
+    const searchQuery = loadPopupData.searchQuery.toLowerCase();
     
     const characterNames = Object.keys(chatCharacters);
     
@@ -312,7 +291,7 @@ export function renderLoadModalFiles(chatId) {
     }
     
     // Сортируем персонажей: сначала те, что распределены в слоты (только для текущего чата)
-    const isCurrentChat = chatId === loadModalData.currentChatId;
+    const isCurrentChat = chatId === loadPopupData.currentChatId;
     if (isCurrentChat) {
         // Создаем Set нормализованных имен из слотов для корректного сравнения
         const slotsState = getSlotsState();
@@ -377,7 +356,7 @@ export function renderLoadModalFiles(chatId) {
             `);
             
             // Проверяем, является ли это сохранение выбранным
-            const isSelected = loadModalData.selectedCharacters[characterName] === file.timestamp;
+            const isSelected = loadPopupData.selectedCharacters[characterName] === file.timestamp;
             if (isSelected) {
                 timestampItem.addClass('selected');
             }
@@ -393,10 +372,10 @@ export function renderLoadModalFiles(chatId) {
                 
                 // Выбираем этот timestamp для персонажа
                 const selectedTimestamp = file.timestamp;
-                loadModalData.selectedCharacters[characterName] = selectedTimestamp;
+                loadPopupData.selectedCharacters[characterName] = selectedTimestamp;
                 
                 // Обновляем UI
-                updateLoadModalSelection();
+                updateLoadPopupSelection();
             });
             
             content.append(timestampItem);
@@ -418,26 +397,26 @@ export function renderLoadModalFiles(chatId) {
 }
 
 // Обновление информации о выбранных персонажах
-export function updateLoadModalSelection() {
-    const selectedCount = Object.keys(loadModalData.selectedCharacters).length;
+export function updateLoadPopupSelection() {
+    const selectedCount = Object.keys(loadPopupData.selectedCharacters).length;
     const selectedInfo = $("#kv-cache-load-selected-info");
     
     if (selectedInfo.length === 0) {
-        return; // Модалка не открыта
+        return; // Popup не открыт
     }
     
     if (selectedCount === 0) {
         selectedInfo.text('Персонажи не выбраны');
         // Отключаем кнопку "Загрузить" если она есть
-        const loadButton = $('[data-popup-button-result="load"]');
+        const loadButton = $(`[data-result="${POPUP_RESULT_LOAD}"]`);
         if (loadButton.length) {
             loadButton.prop('disabled', true);
         }
     } else {
-        const charactersList = Object.keys(loadModalData.selectedCharacters).join(', ');
+        const charactersList = Object.keys(loadPopupData.selectedCharacters).join(', ');
         selectedInfo.html(`<strong>Выбрано:</strong> ${selectedCount} персонаж${selectedCount !== 1 ? 'ей' : ''} (${charactersList})`);
         // Включаем кнопку "Загрузить"
-        const loadButton = $('[data-popup-button-result="load"]');
+        const loadButton = $(`[data-result="${POPUP_RESULT_LOAD}"]`);
         if (loadButton.length) {
             loadButton.prop('disabled', false);
         }
@@ -526,16 +505,16 @@ export async function getLastCacheForCharacter(characterName, currentChatOnly = 
 
 // Загрузка выбранного кеша
 export async function loadSelectedCache() {
-    const selectedCharacters = loadModalData.selectedCharacters;
+    const selectedCharacters = loadPopupData.selectedCharacters;
     
     if (!selectedCharacters || Object.keys(selectedCharacters).length === 0) {
         showToast('error', 'Персонажи не выбраны');
         return;
     }
     
-    // Используем выбранный чат из модалки, если он был выбран, иначе используем текущий
-    const selectedChatId = loadModalData.selectedChatId || loadModalData.currentChatId || getNormalizedChatId();
-    const chats = loadModalData.chats;
+    // Используем выбранный чат из popup, если он был выбран, иначе используем текущий
+    const selectedChatId = loadPopupData.selectedChatId || loadPopupData.currentChatId || getNormalizedChatId();
+    const chats = loadPopupData.chats;
     const chatCharacters = chats[selectedChatId] || {};
     
     let loadedCount = 0;
@@ -644,8 +623,8 @@ export async function loadSelectedCache() {
 
 // Обновление поискового запроса
 export function updateSearchQuery(query) {
-    loadModalData.searchQuery = query;
-    renderLoadModalChats();
+    loadPopupData.searchQuery = query;
+    renderLoadPopupChats();
     const activeChat = $(".kv-cache-load-chat-item.active");
     const activeCurrentChat = $(".kv-cache-load-chat-item-current.active");
     
@@ -653,12 +632,12 @@ export function updateSearchQuery(query) {
     if (activeChat.length) {
         currentChatId = activeChat.data('chat-id');
     } else if (activeCurrentChat.length) {
-        currentChatId = loadModalData.currentChatId;
+        currentChatId = loadPopupData.currentChatId;
     }
     
     if (currentChatId) {
         // Обновляем выбранный чат при поиске
-        loadModalData.selectedChatId = currentChatId;
-        renderLoadModalFiles(currentChatId);
+        loadPopupData.selectedChatId = currentChatId;
+        renderLoadPopupFiles(currentChatId);
     }
 }

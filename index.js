@@ -6,7 +6,7 @@ import { loadSettings, createSettingsHandlers, extensionFolderPath } from './set
 import { onSaveButtonClick, onSaveNowButtonClick, onLoadButtonClick, onReleaseAllSlotsButtonClick, onSaveSlotButtonClick } from './ui.js';
 import { initializeSlots, updateSlotsList, redistributeCharacters, initializePreviousChatId } from './slot-manager.js';
 import { updateNextSaveIndicator, processMessageForAutoSave } from './auto-save.js';
-// Импорты из load-modal.js больше не нужны для index.js, так как модалка теперь управляется через callGenericPopup
+// Импорты из load-popup.js больше не нужны для index.js, так как popup теперь управляется через callGenericPopup
 import { KVCacheManagerInterceptor, setSlotForGeneration } from './generation-interceptor.js';
 
 // Функция вызывается при загрузке расширения

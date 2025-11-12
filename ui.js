@@ -4,7 +4,7 @@ import { getExtensionSettings } from './settings.js';
 import { getNormalizedChatId } from './utils.js';
 import { getSlotsState, initializeSlots } from './slot-manager.js';
 import { saveCache, saveCharacterCache } from './cache-operations.js';
-import { openLoadModal } from './load-modal.js';
+import { openLoadPopup } from './load-popup.js';
 import { updateNextSaveIndicator, resetChatCounters } from './auto-save.js';
 
 // Показ toast-уведомления
@@ -77,7 +77,7 @@ export async function onSaveNowButtonClick() {
 }
 
 export async function onLoadButtonClick() {
-    await openLoadModal();
+    await openLoadPopup();
 }
 
 export async function onReleaseAllSlotsButtonClick() {

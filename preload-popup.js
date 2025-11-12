@@ -194,18 +194,18 @@ export function renderPreloadPopupCharacters(context = document) {
         
         const characterElement = $(`
             <div class="kv-cache-preload-character-item ${mutedClass}" data-character-name="${character.normalizedName}">
-                <label style="display: flex; align-items: center; cursor: pointer; padding: 8px; border-radius: 4px;">
+                <label style="display: flex; align-items: center; cursor: pointer; padding: 8px;">
                     <input type="checkbox" 
                            class="kv-cache-preload-character-checkbox" 
                            data-character-name="${character.normalizedName}"
                            ${isSelected ? 'checked' : ''} 
                            style="margin-right: 10px;" />
                     <div style="flex: 1;">
-                        <div style="font-weight: ${character.isMuted ? 'normal' : 'bold'};">
+                        <div>
                             <i class="fa-solid fa-user" style="margin-right: 5px;"></i>
                             ${character.name}
                         </div>
-                        ${character.isMuted ? '<div style="font-size: 0.85em; color: #888; margin-top: 2px;">(мьючен)</div>' : ''}
+                        ${character.isMuted ? '<div style="font-size: 0.85em; margin-top: 2px;">(мьючен)</div>' : ''}
                     </div>
                 </label>
             </div>

@@ -406,23 +406,15 @@
     }
 }
 
-/* Стили для popup предзагрузки */
+/* Стили для popup предзагрузки - минимальные, используются стандартные стили Tavern */
 #kv-cache-preload-popup-content {
-    min-width: 300px;
-    max-width: 100%;
     display: flex;
     flex-direction: column;
-    height: 100%;
     min-height: 400px;
-    max-height: none;
 }
 
 .kv-cache-preload-search {
     margin-bottom: 15px;
-}
-
-.kv-cache-preload-search input {
-    width: 100%;
 }
 
 .kv-cache-preload-content {
@@ -441,26 +433,10 @@
 #kv-cache-preload-characters-list {
     flex: 1;
     overflow-y: auto;
-    padding: 5px;
-    border: 1px solid var(--SmartThemeBorderColor, #ddd);
-    border-radius: 4px;
-    background: var(--SmartThemeBodyColor, #fff);
 }
 
 .kv-cache-preload-character-item {
     margin-bottom: 5px;
-    border: 1px solid var(--SmartThemeBorderColor, #e0e0e0);
-    border-radius: 4px;
-    background: var(--SmartThemeBodyColor, #fff);
-    transition: background-color 0.2s ease;
-}
-
-.kv-cache-preload-character-item:hover {
-    background: var(--SmartThemeBlurTintColor, rgba(74, 158, 255, 0.1));
-}
-
-.kv-cache-preload-character-item.kv-cache-preload-character-muted {
-    opacity: 0.6;
 }
 
 .kv-cache-preload-character-item label {
@@ -468,35 +444,7 @@
     width: 100%;
 }
 
-.kv-cache-preload-empty {
-    text-align: center;
-    color: var(--SmartThemeBodyColor, #888);
-    padding: 20px;
-    font-style: italic;
-}
-
 #kv-cache-preload-selected-info {
     margin-top: 15px;
-    padding: 10px;
-    background: var(--SmartThemeBlurTintColor, rgba(74, 158, 255, 0.1));
-    border-radius: 4px;
-    border-left: 3px solid var(--SmartThemeBlurTintColor, #4a9eff);
-    font-size: 0.9em;
-    color: var(--SmartThemeBodyColor, inherit);
-}
-
-/* Адаптивные стили для popup предзагрузки */
-@media (max-width: 768px) {
-    #kv-cache-preload-popup-content {
-        min-height: 300px;
-    }
-    
-    .kv-cache-preload-controls {
-        flex-direction: column;
-    }
-    
-    .kv-cache-preload-controls button {
-        width: 100%;
-    }
 }
 

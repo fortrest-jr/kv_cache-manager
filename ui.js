@@ -3,8 +3,10 @@
 import { getExtensionSettings } from './settings.js';
 import { getNormalizedChatId } from './utils.js';
 import { getSlotsState, initializeSlots } from './slot-manager.js';
-import { saveCache, saveCharacterCache } from './cache-operations.js';
+import { saveCache, saveCharacterCache, preloadCharactersCache } from './cache-operations.js';
 import { openLoadPopup } from './load-popup.js';
+import { openPreloadPopup } from './preload-popup.js';
+import { getContext } from "../../../extensions.js";
 
 // Показ toast-уведомления
 export function showToast(type, message, title = 'KV Cache Manager') {
@@ -81,6 +83,27 @@ export async function onLoadButtonClick() {
 export async function onReleaseAllSlotsButtonClick() {
     await initializeSlots();
     showToast('success', 'Все слоты освобождены', 'Режим групповых чатов');
+}
+
+// Обработчик кнопки предзагрузки персонажей
+export async function onPreloadCharactersButtonClick() {
+    // Проверяем, что чат групповой
+    const context = getContext();
+    if (!context || context.groupId === null || context.groupId === undefined) {
+        showToast('error', 'Предзагрузка доступна только для групповых чатов');
+        return;
+    }
+    
+    // Открываем popup для выбора персонажей
+    const selectedCharacters = await openPreloadPopup();
+    
+    if (!selectedCharacters || selectedCharacters.length === 0) {
+        // Пользователь отменил выбор или не выбрал персонажей
+        return;
+    }
+    
+    // Запускаем предзагрузку
+    await preloadCharactersCache(selectedCharacters);
 }
 
 // Сохранение кеша для конкретного слота

@@ -3,7 +3,7 @@
 import { eventSource, event_types } from "../../../../script.js";
 
 import { loadSettings, createSettingsHandlers, extensionFolderPath } from './settings.js';
-import { onSaveButtonClick, onSaveNowButtonClick, onLoadButtonClick, onReleaseAllSlotsButtonClick, onSaveSlotButtonClick } from './ui.js';
+import { onSaveButtonClick, onSaveNowButtonClick, onLoadButtonClick, onReleaseAllSlotsButtonClick, onSaveSlotButtonClick, onPreloadCharactersButtonClick } from './ui.js';
 import { initializeSlots, updateSlotsList, redistributeCharacters, initializePreviousChatId } from './slot-manager.js';
 import { processMessageForAutoSave } from './auto-save.js';
 // Импорты из load-popup.js больше не нужны для index.js, так как popup теперь управляется через callGenericPopup
@@ -41,12 +41,7 @@ jQuery(async () => {
     $("#kv-cache-save-button").on("click", onSaveButtonClick);
     $("#kv-cache-load-button").on("click", onLoadButtonClick);
     $("#kv-cache-save-now-button").on("click", onSaveNowButtonClick);
-    
-    // Кнопка предзагрузки пока не реализована - отключаем
-    $("#kv-cache-preload-characters-button")
-        .prop("disabled", true)
-        .attr("title", "Функция пока не реализована");
-    
+    $("#kv-cache-preload-characters-button").on("click", onPreloadCharactersButtonClick);
     $("#kv-cache-release-all-slots-button").on("click", onReleaseAllSlotsButtonClick);
     
     // Обработчик для кнопок сохранения слотов (делегирование для динамических элементов)

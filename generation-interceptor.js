@@ -11,6 +11,15 @@ import { showToast } from './ui.js';
 // Текущий слот для генерации
 let currentSlot = null;
 
+// Флаг режима предзагрузки
+let isPreloading = false;
+
+// Установка флага режима предзагрузки
+export function setPreloadingMode(enabled) {
+    isPreloading = enabled;
+    console.debug(`[KV Cache Manager] Режим предзагрузки ${enabled ? 'включен' : 'выключен'}`);
+}
+
 // Получение текущего слота
 export function getCurrentSlot() {
     return currentSlot;
@@ -65,8 +74,13 @@ export function getNormalizedCharacterNameFromData(data) {
 export async function KVCacheManagerInterceptor(chat, contextSize, abort, type) {
     const MIN_USAGE_FOR_SAVE = 2;
     
-    // Пропускаем тихие генерации и impersonate
-    if (type === 'quiet' || type === 'impersonate') {
+    // Пропускаем impersonate
+    if (type === 'impersonate') {
+        return;
+    }
+    
+    // Обрабатываем тихие генерации только во время предзагрузки
+    if (type === 'quiet' && !isPreloading) {
         return;
     }
     

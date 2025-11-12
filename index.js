@@ -1835,10 +1835,14 @@ jQuery(async () => {
     // Подписка на событие переключения чата для автозагрузки
     eventSource.on(event_types.CHAT_CHANGED, async () => {
         const currentChatId = getNormalizedChatId();
+        const previousChatIdNormalized = previousChatId;
+        
         // Проверяем, изменилось ли имя чата (и не меняется ли оно на "unknown")
         // previousChatId может быть 'unknown' только при первой смене чата
         const chatIdChanged = currentChatId !== 'unknown' &&
                               previousChatId !== currentChatId;
+        
+        showToast('info', `Смена чата: ${previousChatIdNormalized} -> ${currentChatId}`, 'Отладка смены чата');
         
         // Обновляем previousChatId для следующего события (никогда не присваиваем 'unknown')
         if (currentChatId !== 'unknown') {
@@ -1848,26 +1852,35 @@ jQuery(async () => {
         // Если имя чата не изменилось или меняется с/на unknown - не запускаем очистку
         if (!chatIdChanged) {
             console.debug(`[KV Cache Manager] Имя чата не изменилось (${previousChatIdNormalized} -> ${currentChatId}) или меняется с/на unknown, пропускаем очистку`);
+            showToast('warning', `Очистка пропущена: чат не изменился или unknown (${previousChatIdNormalized} -> ${currentChatId})`, 'Отладка смены чата');
             return;
         }
         
         // Проверяем настройку очистки при смене чата
         if (!extensionSettings.clearOnChatChange) {
             console.debug(`[KV Cache Manager] Очистка при смене чата отключена в настройках`);
+            showToast('warning', 'Очистка при смене чата отключена в настройках', 'Отладка смены чата');
             return;
         }
         
         console.debug(`[KV Cache Manager] Смена чата: ${previousChatIdNormalized} -> ${currentChatId}`);
+        showToast('info', `Начинаю обработку смены чата: ${previousChatIdNormalized} -> ${currentChatId}`, 'Отладка смены чата');
         
         // ВАЖНО: Сначала сохраняем кеш для всех персонажей, которые были в слотах
+        showToast('info', 'Сохранение кеша перед очисткой...', 'Отладка смены чата');
         await saveAllSlotsCache();
+        showToast('success', 'Кеш сохранен', 'Отладка смены чата');
         
         // Затем очищаем все слоты на сервере
+        showToast('info', 'Очистка слотов...', 'Отладка смены чата');
         await clearAllSlotsCache();
+        showToast('success', 'Слоты очищены', 'Отладка смены чата');
         
         // Распределяем персонажей по слотам (групповой режим всегда включен)
         // Кеш загружается автоматически в assignCharactersToSlots для персонажей в слотах
+        showToast('info', 'Распределение персонажей по слотам...', 'Отладка смены чата');
         await assignCharactersToSlots();
+        showToast('success', 'Обработка смены чата завершена', 'Отладка смены чата');
         
     });
     

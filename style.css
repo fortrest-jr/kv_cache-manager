@@ -96,6 +96,7 @@
     flex-direction: column;
     height: 100%;
     min-height: 500px;
+    max-height: none; /* Убираем ограничение максимальной высоты */
 }
 
 .kv-cache-load-search {
@@ -111,7 +112,7 @@
     gap: 0;
     overflow: hidden;
     flex-direction: row;
-    min-height: 400px;
+    min-height: 0; /* Позволяет контейнеру сжиматься и расти динамически */
     align-items: stretch;
 }
 
@@ -135,7 +136,7 @@
 }
 
 .kv-cache-load-files {
-    flex: 1;
+    flex: 1 1 auto; /* Может расти и сжиматься, занимает доступное пространство */
     overflow-y: auto;
     min-height: 0; /* Позволяет flex элементу сжиматься */
     display: flex;

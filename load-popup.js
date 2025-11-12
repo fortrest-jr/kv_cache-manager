@@ -9,8 +9,7 @@ import { showToast } from './ui.js';
 import { getExtensionSettings, extensionFolderPath } from './settings.js';
 import { callGenericPopup, POPUP_TYPE, POPUP_RESULT } from '../../../../scripts/popup.js';
 
-// Константа для результата кнопки "Загрузить"
-const POPUP_RESULT_LOAD = 1001;
+// Используем стандартный POPUP_RESULT.AFFIRMATIVE для кнопки "Загрузить"
 
 // Глобальные переменные для popup загрузки
 // Новая структура: { [chatId]: { [characterName]: [{ timestamp, filename, tag }, ...] } }
@@ -19,7 +18,8 @@ let loadPopupData = {
     currentChatId: null, // ID текущего чата (для отображения)
     selectedChatId: null, // ID выбранного чата в popup (для загрузки)
     selectedCharacters: {}, // { [characterName]: timestamp } - выбранные персонажи и их timestamp
-    searchQuery: ''
+    searchQuery: '',
+    currentPopup: null // Ссылка на текущий открытый popup
 };
 
 // Группировка файлов по чатам и персонажам
@@ -140,12 +140,12 @@ export async function openLoadPopup() {
         {
             large: true,
             allowVerticalScrolling: true,
-            customButtons: [
-                { text: 'Загрузить', result: POPUP_RESULT_LOAD },
-                { text: 'Отмена', result: POPUP_RESULT.NEGATIVE }
-            ],
+            okButton: 'Загрузить', // Используем стандартную кнопку OK с текстом "Загрузить"
             // Инициализация после открытия popup
             onOpen: async (popup) => {
+                // Сохраняем ссылку на popup для использования в других функциях
+                loadPopupData.currentPopup = popup;
+                
                 // Небольшая задержка для гарантии, что DOM готов
                 await new Promise(resolve => setTimeout(resolve, 100));
                 
@@ -169,15 +169,15 @@ export async function openLoadPopup() {
                 renderLoadPopupChats(popup.dlg);
                 selectLoadPopupChat('current', popup.dlg);
                 
-                // Изначально отключаем кнопку "Загрузить"
-                const loadButton = popup.dlg.querySelector(`[data-result="${POPUP_RESULT_LOAD}"]`);
+                // Изначально отключаем кнопку "Загрузить" (стандартная OK кнопка)
+                const loadButton = popup.okButton;
                 if (loadButton) {
                     loadButton.disabled = true;
                 }
             },
             // Выполняем загрузку перед закрытием popup, если была нажата кнопка "Загрузить"
             onClosing: async (popup) => {
-                if (popup.result === POPUP_RESULT_LOAD && !loadPerformed) {
+                if (popup.result === POPUP_RESULT.AFFIRMATIVE && !loadPerformed) {
                     // Проверяем, что персонажи выбраны
                     if (Object.keys(loadPopupData.selectedCharacters).length === 0) {
                         showToast('error', 'Персонажи не выбраны');
@@ -187,6 +187,10 @@ export async function openLoadPopup() {
                     await performLoad();
                 }
                 return true; // Разрешаем закрытие popup
+            },
+            // Очищаем ссылку на popup при закрытии
+            onClose: async (popup) => {
+                loadPopupData.currentPopup = null;
             }
         }
     );
@@ -432,20 +436,21 @@ export function updateLoadPopupSelection(context = document) {
         return; // Popup не открыт
     }
     
+    // Используем popup.okButton для управления кнопкой
+    const loadButton = loadPopupData.currentPopup?.okButton;
+    
     if (selectedCount === 0) {
         selectedInfo.text('Персонажи не выбраны');
         // Отключаем кнопку "Загрузить" если она есть
-        const loadButton = $(context).find(`[data-result="${POPUP_RESULT_LOAD}"]`);
-        if (loadButton.length) {
-            loadButton.prop('disabled', true);
+        if (loadButton) {
+            loadButton.disabled = true;
         }
     } else {
         const charactersList = Object.keys(loadPopupData.selectedCharacters).join(', ');
         selectedInfo.html(`<strong>Выбрано:</strong> ${selectedCount} персонаж${selectedCount !== 1 ? 'ей' : ''} (${charactersList})`);
         // Включаем кнопку "Загрузить"
-        const loadButton = $(context).find(`[data-result="${POPUP_RESULT_LOAD}"]`);
-        if (loadButton.length) {
-            loadButton.prop('disabled', false);
+        if (loadButton) {
+            loadButton.disabled = false;
         }
     }
 }

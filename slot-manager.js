@@ -5,7 +5,7 @@ import { getGroupMembers } from '../../../group-chats.js';
 import LlamaApi from './llama-api.js';
 import { normalizeCharacterName, getSlotsCountFromData } from './utils.js';
 import { showToast } from './ui.js';
-import { saveCharacterCache } from './cache-operations.js';
+import { saveCharacterCache, saveAllSlotsCache, clearAllSlotsCache } from './cache-operations.js';
 
 // Инициализация API клиента
 const llamaApi = new LlamaApi();
@@ -323,4 +323,38 @@ export function resetSlotUsage(slotIndex) {
     if (slotsState[slotIndex]) {
         slotsState[slotIndex].usage = 0;
     }
+}
+
+// Обработка смены чата
+// Сохраняет кеш, очищает слоты и распределяет персонажей нового чата
+export async function handleChatChange(previousChatId, currentChatId, extensionSettings) {
+    // Проверяем, изменилось ли имя чата (и не меняется ли оно на "unknown")
+    // previousChatId может быть 'unknown' только при первой смене чата
+    const chatIdChanged = currentChatId !== 'unknown' &&
+                          previousChatId !== currentChatId;
+    
+    // Если имя чата не изменилось или меняется с/на unknown - не запускаем очистку
+    if (!chatIdChanged) {
+        console.debug(`[KV Cache Manager] Имя чата не изменилось (${previousChatId} -> ${currentChatId}) или меняется с/на unknown, пропускаем очистку`);
+        return false;
+    }
+    
+    // Проверяем настройку очистки при смене чата
+    if (!extensionSettings.clearOnChatChange) {
+        console.debug(`[KV Cache Manager] Очистка при смене чата отключена в настройках`);
+        return false;
+    }
+    
+    console.debug(`[KV Cache Manager] Смена чата: ${previousChatId} -> ${currentChatId}`);
+    
+    // ВАЖНО: Сначала сохраняем кеш для всех персонажей, которые были в слотах
+    await saveAllSlotsCache();
+    
+    // Затем очищаем все слоты на сервере
+    await clearAllSlotsCache();
+    
+    // Распределяем персонажей по слотам (групповой режим всегда включен)
+    await assignCharactersToSlots();
+    
+    return true;
 }

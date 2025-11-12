@@ -200,6 +200,31 @@ export async function saveCharacterCache(characterName, slotIndex) {
     }
 }
 
+// Сохранение кеша для всех персонажей, которые находятся в слотах
+// Используется перед очисткой слотов при смене чата
+export async function saveAllSlotsCache() {
+    const MIN_USAGE_FOR_SAVE = 2;
+    const slotsState = getSlotsState();
+    const totalSlots = slotsState.length;
+    
+    // Сохраняем кеш для всех персонажей, которые были в слотах перед очисткой
+    // Важно: дожидаемся завершения сохранения перед очисткой слотов, чтобы избежать потери данных
+    for (let i = 0; i < totalSlots; i++) {
+        const slot = slotsState[i];
+        const currentCharacter = slot?.characterName;
+        if (currentCharacter && typeof currentCharacter === 'string') {
+            const usageCount = slot.usage || 0;
+            
+            // Сохраняем кеш перед вытеснением только если персонаж использовал слот минимум 2 раза
+            if (usageCount >= MIN_USAGE_FOR_SAVE) {
+                await saveCharacterCache(currentCharacter, i);
+            } else {
+                console.debug(`[KV Cache Manager] Пропускаем сохранение кеша для ${currentCharacter} (использование: ${usageCount} < ${MIN_USAGE_FOR_SAVE})`);
+            }
+        }
+    }
+}
+
 // Общая функция сохранения кеша
 // Сохраняет всех персонажей, которые находятся в слотах
 export async function saveCache(requestTag = false) {

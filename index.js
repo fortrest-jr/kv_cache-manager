@@ -7,114 +7,18 @@ import { eventSource, event_types } from "../../../../script.js";
 // Импортируем модули
 import { getExtensionSettings, loadSettings, createSettingsHandlers } from './settings.js';
 import { getNormalizedChatId } from './utils.js';
-import { showToast } from './ui.js';
-import { initializeSlots, assignCharactersToSlots, updateSlotsList, getSlotsState } from './slot-manager.js';
-import { saveCache, saveCharacterCache, clearAllSlotsCache } from './cache-operations.js';
-import { updateNextSaveIndicator, incrementMessageCounter, resetChatCounters } from './auto-save.js';
-import { openLoadModal, closeLoadModal, selectLoadModalChat, renderLoadModalChats, renderLoadModalFiles, loadSelectedCache, updateSearchQuery } from './load-modal.js';
+import { onSaveButtonClick, onSaveNowButtonClick, onLoadButtonClick, onReleaseAllSlotsButtonClick, onSaveSlotButtonClick } from './ui.js';
+import { initializeSlots, assignCharactersToSlots, updateSlotsList, handleChatChange } from './slot-manager.js';
+import { updateNextSaveIndicator, incrementMessageCounter } from './auto-save.js';
+import { closeLoadModal, selectLoadModalChat, loadSelectedCache, updateSearchQuery } from './load-modal.js';
 import { KVCacheManagerInterceptor, getCurrentSlot, getNormalizedCharacterNameFromData } from './generation-interceptor.js';
 
 // Имя расширения должно совпадать с именем папки
 const extensionName = "kv_cache-manager";
 const extensionFolderPath = `scripts/extensions/third-party/${extensionName}`;
 
-// Константы
-const MIN_USAGE_FOR_SAVE = 2; // Минимальное количество использований слота для сохранения кеша перед вытеснением
-
 // Переменная для отслеживания предыдущего чата
 let previousChatId = 'unknown';
-
-// Сохранение кеша для всех персонажей, которые находятся в слотах
-// Используется перед очисткой слотов при смене чата
-async function saveAllSlotsCache() {
-    const slotsState = getSlotsState();
-    const totalSlots = slotsState.length;
-    
-    // Сохраняем кеш для всех персонажей, которые были в слотах перед очисткой
-    // Важно: дожидаемся завершения сохранения перед очисткой слотов, чтобы избежать потери данных
-    for (let i = 0; i < totalSlots; i++) {
-        const slot = slotsState[i];
-        const currentCharacter = slot?.characterName;
-        if (currentCharacter && typeof currentCharacter === 'string') {
-            const usageCount = slot.usage || 0;
-            
-            // Сохраняем кеш перед вытеснением только если персонаж использовал слот минимум 2 раза
-            if (usageCount >= MIN_USAGE_FOR_SAVE) {
-                await saveCharacterCache(currentCharacter, i);
-            } else {
-                console.debug(`[KV Cache Manager] Пропускаем сохранение кеша для ${currentCharacter} (использование: ${usageCount} < ${MIN_USAGE_FOR_SAVE})`);
-            }
-        }
-    }
-}
-
-// Обработчики для кнопок
-async function onSaveButtonClick() {
-    await saveCache(true);
-}
-
-async function onSaveNowButtonClick() {
-    const success = await saveCache(false);
-    if (success) {
-        // Сбрасываем счётчики всех персонажей текущего чата после успешного сохранения
-        const chatId = getNormalizedChatId();
-        resetChatCounters(chatId);
-        updateNextSaveIndicator();
-    }
-}
-
-async function onLoadButtonClick() {
-    await openLoadModal();
-}
-
-async function onReleaseAllSlotsButtonClick() {
-    await initializeSlots();
-    showToast('success', 'Все слоты освобождены', 'Режим групповых чатов');
-}
-
-// Сохранение кеша для конкретного слота
-async function onSaveSlotButtonClick(event) {
-    const button = $(event.target).closest('.kv-cache-save-slot-button');
-    const slotIndex = parseInt(button.data('slot-index'));
-    const characterName = button.data('character-name');
-    
-    if (isNaN(slotIndex) || !characterName) {
-        showToast('error', 'Ошибка: неверные данные слота', 'Сохранение слота');
-        return;
-    }
-    
-    // Проверяем, что слот действительно занят этим персонажем
-    // characterName из data-атрибута уже нормализован (хранится в slotsState)
-    const slotsState = getSlotsState();
-    const slot = slotsState[slotIndex];
-    if (!slot || !slot.characterName || slot.characterName !== characterName) {
-        showToast('error', 'Персонаж не найден в этом слоте', 'Сохранение слота');
-        return;
-    }
-    
-    // Временно отключаем кнопку
-    button.prop('disabled', true);
-    const originalTitle = button.attr('title');
-    button.attr('title', 'Сохранение...');
-    
-    try {
-        showToast('info', `Сохранение кеша для ${characterName}...`, 'Сохранение слота');
-        const success = await saveCharacterCache(characterName, slotIndex);
-        
-        if (success) {
-            showToast('success', `Кеш для ${characterName} успешно сохранен`, 'Сохранение слота');
-        } else {
-            showToast('error', `Не удалось сохранить кеш для ${characterName}`, 'Сохранение слота');
-        }
-    } catch (e) {
-        console.error(`[KV Cache Manager] Ошибка при сохранении слота ${slotIndex}:`, e);
-        showToast('error', `Ошибка при сохранении: ${e.message}`, 'Сохранение слота');
-    } finally {
-        // Включаем кнопку обратно
-        button.prop('disabled', false);
-        button.attr('title', originalTitle);
-    }
-}
 
 // Функция вызывается при загрузке расширения
 jQuery(async () => {
@@ -125,7 +29,6 @@ jQuery(async () => {
     // Загружаем настройки при старте
     await loadSettings();
     await initializeSlots();
-    await assignCharactersToSlots();
     
     // Инициализируем previousChatId как 'unknown' при старте
     // previousChatId больше никогда не будет присвоен 'unknown'
@@ -134,7 +37,7 @@ jQuery(async () => {
     updateNextSaveIndicator();
     
     // Обновляем список слотов при запуске генерации
-    eventSource.on(event_types.GENERATE_BEFORE_COMBINE_PROMPTS, async (data) => {
+    eventSource.on(event_types.GENERATE_BEFORE_COMBINE_PROMPTS, async () => {
         updateSlotsList();
     });
     
@@ -161,12 +64,6 @@ jQuery(async () => {
     eventSource.on(event_types.CHAT_CHANGED, async () => {
         const currentChatId = getNormalizedChatId();
         const previousChatIdNormalized = previousChatId;
-        
-        // Проверяем, изменилось ли имя чата (и не меняется ли оно на "unknown")
-        // previousChatId может быть 'unknown' только при первой смене чата
-        const chatIdChanged = currentChatId !== 'unknown' &&
-                              previousChatId !== currentChatId;
-        
         const extensionSettings = getExtensionSettings();
         
         // Обновляем previousChatId для следующего события (никогда не присваиваем 'unknown')
@@ -174,28 +71,8 @@ jQuery(async () => {
             previousChatId = currentChatId;
         }
         
-        // Если имя чата не изменилось или меняется с/на unknown - не запускаем очистку
-        if (!chatIdChanged) {
-            console.debug(`[KV Cache Manager] Имя чата не изменилось (${previousChatIdNormalized} -> ${currentChatId}) или меняется с/на unknown, пропускаем очистку`);
-            return;
-        }
-        
-        // Проверяем настройку очистки при смене чата
-        if (!extensionSettings.clearOnChatChange) {
-            console.debug(`[KV Cache Manager] Очистка при смене чата отключена в настройках`);
-            return;
-        }
-        
-        console.debug(`[KV Cache Manager] Смена чата: ${previousChatIdNormalized} -> ${currentChatId}`);
-        
-        // ВАЖНО: Сначала сохраняем кеш для всех персонажей, которые были в слотах
-        await saveAllSlotsCache();
-        
-        // Затем очищаем все слоты на сервере
-        await clearAllSlotsCache();
-        
-        // Распределяем персонажей по слотам (групповой режим всегда включен)
-        await assignCharactersToSlots();
+        // Обрабатываем смену чата
+        await handleChatChange(previousChatIdNormalized, currentChatId, extensionSettings);
     });
     
     // При переключении чата счетчик не сбрасывается - каждый чат имеет свой независимый счетчик

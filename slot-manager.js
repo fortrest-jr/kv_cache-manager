@@ -335,8 +335,8 @@ export function initializePreviousChatId() {
 }
 
 // Обработка события смены чата
-// Вызывается при событии CHAT_CHANGED
-export async function onChatChanged() {
+// Сохраняет кеш текущих персонажей, очищает слоты и распределяет персонажей нового чата
+export async function redistributeCharacters() {
     const currentChatId = getNormalizedChatId();
     const previousChatIdNormalized = previousChatId;
     const extensionSettings = getExtensionSettings();
@@ -347,12 +347,12 @@ export async function onChatChanged() {
     }
     
     // Обрабатываем смену чата
-    await handleChatChange(previousChatIdNormalized, currentChatId, extensionSettings);
+    await processChatChange(previousChatIdNormalized, currentChatId, extensionSettings);
 }
 
-// Обработка смены чата
+// Внутренняя функция обработки смены чата
 // Сохраняет кеш, очищает слоты и распределяет персонажей нового чата
-async function handleChatChange(previousChatIdParam, currentChatId, extensionSettings) {
+async function processChatChange(previousChatIdParam, currentChatId, extensionSettings) {
     // Проверяем, изменилось ли имя чата (и не меняется ли оно на "unknown")
     // previousChatId может быть 'unknown' только при первой смене чата
     const chatIdChanged = currentChatId !== 'unknown' &&

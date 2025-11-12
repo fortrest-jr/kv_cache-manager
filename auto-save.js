@@ -92,65 +92,84 @@ export function updateNextSaveIndicator() {
 }
 
 // Увеличение счетчика сообщений для конкретного персонажа
-// @param {string} characterName - Имя персонажа (будет нормализовано)
-export async function incrementMessageCounter(characterName) {
-    const extensionSettings = getExtensionSettings();
-    
-    if (!extensionSettings.enabled) {
-        return;
-    }
-    
+// @param {string} characterName - Нормализованное имя персонажа
+// @returns {number} - новое значение счётчика или null, если персонаж не найден
+export function incrementMessageCounter(characterName) {
     if (!characterName) {
-        // Если имя персонажа не указано, пропускаем
-        return;
+        return null;
     }
-    
-    // Нормализуем имя персонажа
-    const normalizedName = normalizeCharacterName(characterName);
     
     const chatId = getNormalizedChatId();
     if (!messageCounters[chatId]) {
         messageCounters[chatId] = {};
     }
     
-    if (!messageCounters[chatId][normalizedName]) {
-        messageCounters[chatId][normalizedName] = 0;
+    if (!messageCounters[chatId][characterName]) {
+        messageCounters[chatId][characterName] = 0;
     }
     
-    messageCounters[chatId][normalizedName]++;
-    
-    updateNextSaveIndicator();
-    
-    // Проверяем, нужно ли сохранить для этого персонажа
+    messageCounters[chatId][characterName]++;
+
+    return messageCounters[chatId][characterName];
+}
+
+// Проверка необходимости автосохранения и выполнение сохранения
+// @param {string} characterName - Нормализованное имя персонажа
+// @param {number} currentCount - Текущее значение счётчика
+async function checkAndPerformAutoSave(characterName, currentCount) {
+    const extensionSettings = getExtensionSettings();
     const interval = extensionSettings.saveInterval;
-    if (messageCounters[chatId][normalizedName] >= interval) {
-        // Находим слот, в котором находится персонаж
-        // characterName уже нормализован, имена в slotsState тоже нормализованы
-        const slotsState = getSlotsState();
-        let slotIndex = findCharacterSlotIndex(normalizedName);
-        
-        if (slotIndex !== null) {
-            // Запускаем автосохранение для этого персонажа
-            try {
-                const success = await saveCharacterCache(normalizedName, slotIndex);
-                if (success) {
-                    // Сбрасываем счетчик только после успешного сохранения
-                    messageCounters[chatId][normalizedName] = 0;
-                    updateNextSaveIndicator();
-                }
-            } catch (e) {
-                // При ошибке не сбрасываем счетчик, чтобы попробовать сохранить снова
-                console.error(`[KV Cache Manager] Ошибка при автосохранении кеша для персонажа ${normalizedName}:`, e);
-            }
-        } else {
-            console.warn(`[KV Cache Manager] Не удалось найти слот для сохранения персонажа ${normalizedName}`);
+    
+    if (currentCount < interval) {
+        return;
+    }
+    
+    // Находим слот, в котором находится персонаж
+    const slotIndex = findCharacterSlotIndex(characterName);
+    
+    if (slotIndex === null) {
+        console.warn(`[KV Cache Manager] Не удалось найти слот для сохранения персонажа ${characterName}`);
+        return;
+    }
+    
+    // Запускаем автосохранение для этого персонажа
+    try {
+        const success = await saveCharacterCache(characterName, slotIndex);
+        if (success) {
+            // Сбрасываем счетчик только после успешного сохранения
+            const chatId = getNormalizedChatId();
+            messageCounters[chatId][characterName] = 0;
         }
+    } catch (e) {
+        // При ошибке не сбрасываем счетчик, чтобы попробовать сохранить снова
+        console.error(`[KV Cache Manager] Ошибка при автосохранении кеша для персонажа ${characterName}:`, e);
     }
 }
 
 // Обработка события получения сообщения для автосохранения
-export async function onMessageReceived(data) {
+// Увеличивает счетчик сообщений персонажа и проверяет необходимость автосохранения
+export async function processMessageForAutoSave(data) {
+    const extensionSettings = getExtensionSettings();
+    
+    if (!extensionSettings.enabled) {
+        return;
+    }
+    
     // Получаем нормализованное имя персонажа из данных события
     const characterName = getNormalizedCharacterNameFromData(data);
-    await incrementMessageCounter(characterName);
+    
+    if (!characterName) {
+        return;
+    }
+    
+    // Увеличиваем счётчик
+    const newCount = incrementMessageCounter(characterName);
+    
+    if (newCount === null) {
+        return;
+    }
+    
+    await checkAndPerformAutoSave(characterName, newCount);
+    
+    updateNextSaveIndicator();
 }

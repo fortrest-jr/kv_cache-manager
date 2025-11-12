@@ -4,8 +4,8 @@ import { eventSource, event_types } from "../../../../script.js";
 
 import { loadSettings, createSettingsHandlers } from './settings.js';
 import { onSaveButtonClick, onSaveNowButtonClick, onLoadButtonClick, onReleaseAllSlotsButtonClick, onSaveSlotButtonClick } from './ui.js';
-import { initializeSlots, updateSlotsList, onChatChanged, initializePreviousChatId } from './slot-manager.js';
-import { updateNextSaveIndicator, onMessageReceived } from './auto-save.js';
+import { initializeSlots, updateSlotsList, redistributeCharacters, initializePreviousChatId } from './slot-manager.js';
+import { updateNextSaveIndicator, processMessageForAutoSave } from './auto-save.js';
 import { closeLoadModal, selectLoadModalChat, loadSelectedCache, updateSearchQuery } from './load-modal.js';
 import { KVCacheManagerInterceptor, setSlotForGeneration } from './generation-interceptor.js';
 
@@ -29,18 +29,10 @@ jQuery(async () => {
     window['KVCacheManagerInterceptor'] = KVCacheManagerInterceptor;
     
     // Обновляем список слотов при запуске генерации
-    eventSource.on(event_types.GENERATE_BEFORE_COMBINE_PROMPTS, async () => {
-        updateSlotsList();
-    });
-    
-    // Устанавливаем слот персонажу для генерации
+    eventSource.on(event_types.GENERATE_BEFORE_COMBINE_PROMPTS, updateSlotsList);
     eventSource.on(event_types.TEXT_COMPLETION_SETTINGS_READY, setSlotForGeneration);
-    
-    // Подписка на событие получения сообщения для автосохранения
-    eventSource.on(event_types.MESSAGE_RECEIVED, onMessageReceived);
-    
-    // Подписка на событие переключения чата для автозагрузки
-    eventSource.on(event_types.CHAT_CHANGED, onChatChanged);
+    eventSource.on(event_types.MESSAGE_RECEIVED, processMessageForAutoSave);
+    eventSource.on(event_types.CHAT_CHANGED, redistributeCharacters);
 
     // Настраиваем обработчики событий для изменения настроек
     const settingsHandlers = createSettingsHandlers();

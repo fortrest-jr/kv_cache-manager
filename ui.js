@@ -37,16 +37,18 @@ export function showToast(type, message, title = 'KV Cache Manager') {
     }
 }
 
-// Отключение всех кнопок сохранения (кроме кнопок отдельных слотов)
+// Отключение всех кнопок сохранения
 export function disableAllSaveButtons() {
     $("#kv-cache-save-button").prop('disabled', true);
     $("#kv-cache-save-now-button").prop('disabled', true);
+    $(".kv-cache-save-slot-button").prop('disabled', true);
 }
 
 // Включение всех кнопок сохранения
 export function enableAllSaveButtons() {
     $("#kv-cache-save-button").prop('disabled', false);
     $("#kv-cache-save-now-button").prop('disabled', false);
+    $(".kv-cache-save-slot-button").prop('disabled', false);
 }
 
 // Обработчики для кнопок

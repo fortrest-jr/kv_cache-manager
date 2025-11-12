@@ -6,6 +6,34 @@ import { acquireSlot, updateSlotsList } from './slot-manager.js';
 import { saveCharacterCache } from './cache-operations.js';
 import { showToast, disableAllSaveButtons, enableAllSaveButtons } from './ui.js';
 import { setPreloadingMode } from './generation-interceptor.js';
+import { createHiddenMessage, editMessageUsingUpdate } from './hidden-message.js';
+
+// Формирование текста статуса предзагрузки
+function formatPreloadStatus(current, total, preloaded, errors) {
+    const remaining = total - current;
+    const progress = total > 0 ? Math.round((current / total) * 100) : 0;
+    
+    let status = `**Предзагрузка кеша**\n\n`;
+    status += `Прогресс: ${current}/${total} (${progress}%)\n`;
+    status += `Прогрето: ${preloaded.length}\n`;
+    status += `Осталось: ${remaining}\n`;
+    
+    if (preloaded.length > 0) {
+        status += `\n**Прогретые персонажи:**\n`;
+        preloaded.forEach((name, idx) => {
+            status += `${idx + 1}. ${name}\n`;
+        });
+    }
+    
+    if (errors.length > 0) {
+        status += `\n**Ошибки:**\n`;
+        errors.forEach((error, idx) => {
+            status += `${idx + 1}. ${error}\n`;
+        });
+    }
+    
+    return status;
+}
 
 // Предзагрузка кеша для выбранных персонажей
 // @param {Array<{name: string, normalizedName: string, characterId: string, avatar: string, isMuted: boolean}>} characters - Массив персонажей для предзагрузки
@@ -28,11 +56,15 @@ export async function preloadCharactersCache(characters) {
     // Отключаем кнопки сохранения
     disableAllSaveButtons();
     
+    // Создаем скрытое сообщение для отслеживания прогресса
+    let statusMessageId = null;
+    const preloaded = [];
+    const errors = [];
+    
     try {
-        showToast('info', `Начинаю предзагрузку кеша для ${characters.length} персонажей...`, 'Предзагрузка');
-        
-        let preloadedCount = 0;
-        let errors = [];
+        // Создаем начальное сообщение
+        const initialStatus = formatPreloadStatus(0, characters.length, [], []);
+        statusMessageId = await createHiddenMessage(initialStatus, 'KV Cache Manager');
         
         // Обрабатываем каждого персонажа последовательно
         for (let i = 0; i < characters.length; i++) {
@@ -43,11 +75,20 @@ export async function preloadCharactersCache(characters) {
             
             if (!characterId) {
                 errors.push(`${characterName}: не найден ID персонажа`);
+                // Обновляем статус
+                if (statusMessageId !== null) {
+                    const status = formatPreloadStatus(i + 1, characters.length, preloaded, errors);
+                    await editMessageUsingUpdate(statusMessageId, status);
+                }
                 continue;
             }
             
             try {
-                showToast('info', `Предзагрузка ${i + 1}/${characters.length}: ${characterName}...`, 'Предзагрузка');
+                // Обновляем статус перед началом обработки персонажа
+                if (statusMessageId !== null) {
+                    const status = formatPreloadStatus(i, characters.length, preloaded, errors);
+                    await editMessageUsingUpdate(statusMessageId, status);
+                }
                 
                 // Получаем/занимаем слот для персонажа
                 const slotIndex = await acquireSlot(normalizedName, 0); // Не сохраняем при вытеснении во время предзагрузки
@@ -136,24 +177,42 @@ export async function preloadCharactersCache(characters) {
                 const saved = await saveCharacterCache(normalizedName, slotIndex);
                 
                 if (saved) {
-                    preloadedCount++;
+                    preloaded.push(characterName);
                     console.debug(`[KV Cache Manager] Кеш для персонажа ${characterName} успешно предзагружен`);
                 } else {
                     errors.push(`${characterName}: ошибка сохранения кеша`);
                 }
                 
+                // Обновляем статус после обработки персонажа
+                if (statusMessageId !== null) {
+                    const status = formatPreloadStatus(i + 1, characters.length, preloaded, errors);
+                    await editMessageUsingUpdate(statusMessageId, status);
+                }
+                
             } catch (e) {
                 console.error(`[KV Cache Manager] Ошибка при предзагрузке для персонажа ${characterName}:`, e);
                 errors.push(`${characterName}: ${e.message || 'Неизвестная ошибка'}`);
+                
+                // Обновляем статус при ошибке
+                if (statusMessageId !== null) {
+                    const status = formatPreloadStatus(i + 1, characters.length, preloaded, errors);
+                    await editMessageUsingUpdate(statusMessageId, status);
+                }
             }
         }
         
-        // Показываем результат
-        if (preloadedCount > 0) {
+        // Финальное обновление статуса
+        if (statusMessageId !== null) {
+            const finalStatus = formatPreloadStatus(characters.length, characters.length, preloaded, errors);
+            await editMessageUsingUpdate(statusMessageId, finalStatus);
+        }
+        
+        // Показываем финальный тост
+        if (preloaded.length > 0) {
             if (errors.length > 0) {
-                showToast('warning', `Предзагружено ${preloadedCount} из ${characters.length} персонажей. Ошибки: ${errors.join(', ')}`, 'Предзагрузка');
+                showToast('warning', `Предзагружено ${preloaded.length} из ${characters.length} персонажей. Ошибки: ${errors.length}`, 'Предзагрузка');
             } else {
-                showToast('success', `Успешно предзагружено ${preloadedCount} персонажей`, 'Предзагрузка');
+                showToast('success', `Успешно предзагружено ${preloaded.length} персонажей`, 'Предзагрузка');
             }
             
             // Обновляем список слотов
@@ -161,7 +220,7 @@ export async function preloadCharactersCache(characters) {
             
             return true;
         } else {
-            showToast('error', `Не удалось предзагрузить кеши. Ошибки: ${errors.join(', ')}`, 'Предзагрузка');
+            showToast('error', `Не удалось предзагрузить кеши. Ошибки: ${errors.length}`, 'Предзагрузка');
             return false;
         }
         

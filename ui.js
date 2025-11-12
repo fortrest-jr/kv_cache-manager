@@ -8,15 +8,23 @@ import { openLoadModal } from './load-modal.js';
 import { updateNextSaveIndicator, resetChatCounters } from './auto-save.js';
 
 // Показ toast-уведомления
-export function showToast(type, message, title = 'KV Cache Manager') {
+export function showToast(type, message, title = 'KV Cache Manager', force = false) {
     const extensionSettings = getExtensionSettings();
     
+    // Всегда логируем в консоль для отладки
+    const logLevel = type === 'error' ? 'error' : type === 'warning' ? 'warn' : 'log';
+    console[logLevel](`[KV Cache Manager] ${title}: ${message}`);
+    
     if (typeof toastr === 'undefined') {
-        console.debug(`[KV Cache Manager] ${title}: ${message}`);
+        // Если toastr не определен, пытаемся показать через alert для критических ошибок
+        if (type === 'error' && force) {
+            alert(`[KV Cache Manager] ${title}: ${message}`);
+        }
         return;
     }
 
-    if (!extensionSettings.showNotifications) {
+    // Если не принудительный показ, проверяем настройки
+    if (!force && !extensionSettings.showNotifications) {
         return;
     }
 

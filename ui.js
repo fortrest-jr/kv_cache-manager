@@ -3,7 +3,8 @@
 import { getExtensionSettings } from './settings.js';
 import { getNormalizedChatId } from './utils.js';
 import { getSlotsState, initializeSlots } from './slot-manager.js';
-import { saveCache, saveCharacterCache, preloadCharactersCache } from './cache-operations.js';
+import { saveCache, saveCharacterCache } from './cache-operations.js';
+import { preloadCharactersCache } from './preload-cache.js';
 import { openLoadPopup } from './load-popup.js';
 import { openPreloadPopup } from './preload-popup.js';
 import { getContext } from "../../../extensions.js";

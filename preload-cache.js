@@ -2,7 +2,6 @@
 
 import { getContext } from "../../../extensions.js";
 import { generateQuietPrompt } from "../../../../script.js";
-import { updateSlotsList } from './slot-manager.js';
 import { saveCharacterCache } from './cache-operations.js';
 import { showToast, disableAllSaveButtons, enableAllSaveButtons } from './ui.js';
 import { setPreloadingMode, setCurrentPreloadCharacter, getCurrentSlot } from './generation-interceptor.js';
@@ -236,9 +235,7 @@ export async function preloadCharactersCache(characters) {
                     
                     // generateQuietPrompt возвращает промис
                     currentGenerationTask = generateQuietPrompt({
-                        quietPrompt: '',
                         forceChId: characterId,
-                        quietToLoud: false,
                         responseLength: 1
                     });
                     

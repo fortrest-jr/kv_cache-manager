@@ -27,9 +27,8 @@ function formatPreloadStatus(current, total, preloaded, errors, currentCharacter
     const remaining = total - current;
     const progress = total > 0 ? Math.round((current / total) * 100) : 0;
     
-    // Обертываем в div с выравниванием по левому краю
-    let status = `<div style="text-align: left;">\n`;
-    status += `**Предзагрузка кеша**\n\n`;
+    // Формируем статус в markdown формате
+    let status = `**Предзагрузка кеша**\n\n`;
     
     if (isCancelled) {
         status += `⚠️ **Отменено**\n\n`;
@@ -66,8 +65,6 @@ function formatPreloadStatus(current, total, preloaded, errors, currentCharacter
     if (!isCancelled && current < total && messageId !== null) {
         status += `\n\n<button id="kv-cache-preload-cancel-btn-${messageId}" class="menu_button" type="button">Отменить</button>`;
     }
-    
-    status += `</div>`;
     
     return status;
 }

@@ -21,10 +21,7 @@ export async function createHiddenMessage(text, isSmallSys = true, name = 'KV Ca
         send_date: context.humanizedDateTime(),
         mes: text,
         extra: {
-            // [IGNORE_SYMBOL]: true,
             gen_id: Date.now(),
-            // api: 'manual',
-            // model: 'hidden message',
             isSmallSys: isSmallSys,
         },
     };

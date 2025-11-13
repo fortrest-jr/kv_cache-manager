@@ -6,7 +6,6 @@ import { generateSaveFilename, getFilesList, deleteFile, rotateCharacterFiles } 
 import { getAllSlotsInfo, getSlotsState, resetSlotUsage, setSlotCacheLoaded, getSlotsCountFromData, updateSlotsList } from './slot-manager.js';
 import { showToast, disableAllSaveButtons, enableAllSaveButtons } from './ui.js';
 import { getExtensionSettings } from './settings.js';
-import { updateNextSaveIndicator } from './auto-save.js';
 
 // Инициализация API клиента
 const llamaApi = new LlamaApi();
@@ -188,7 +187,11 @@ export async function saveCharacterCache(characterName, slotIndex) {
         if (success) {
             // Выполняем ротацию файлов для этого персонажа
             await rotateCharacterFiles(characterName);
-            console.debug(`[KV Cache Manager] Кеш успешно сохранен для персонажа ${characterName}`);
+            
+            // Сбрасываем usage после успешного сохранения
+            resetSlotUsage(slotIndex);
+            
+            console.debug(`[KV Cache Manager] Кеш успешно сохранен для персонажа ${characterName}, usage сброшен`);
             return true;
         } else {
             console.error(`[KV Cache Manager] Не удалось сохранить кеш для персонажа ${characterName}`);
@@ -310,11 +313,6 @@ export async function saveCache(requestTag = false) {
             console.error(`[KV Cache Manager] Ошибка при сохранении персонажа ${characterName}:`, e);
             saveErrors.push(`${characterName}: ${e.message}`);
         }
-    }
-    
-    // Обновляем индикатор после автосохранения
-    if (!tag && successfullySaved.length > 0) {
-        updateNextSaveIndicator();
     }
     
     // Возвращаем true при успешном сохранении (хотя бы один персонаж сохранен)

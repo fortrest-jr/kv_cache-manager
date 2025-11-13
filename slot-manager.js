@@ -45,13 +45,20 @@ export async function getAllSlotsInfo() {
     }
 }
 
+// Создание объекта слота с персонажем
+// @param {string} characterName - Нормализованное имя персонажа
+export function createSlotWithCharacter(characterName) {
+    return {
+        characterName: characterName,
+        usage: 0,
+        cacheLoaded: false,
+        generationType: null
+    };
+}
+
 // Создание объекта пустого слота
 export function createEmptySlot() {
-    return {
-        characterName: undefined,
-        usage: 0,
-        cacheLoaded: false
-    };
+    return createSlotWithCharacter(undefined);
 }
 
 // Инициализация слотов для режима групповых чатов
@@ -150,11 +157,7 @@ export async function assignCharactersToSlots() {
     // Распределяем персонажей по слотам: идем по индексу, пока не закончатся либо слоты, либо персонажи
     // Имена уже нормализованы из getNormalizedChatCharacters()
     for (let i = 0; i < totalSlots && i < chatCharacters.length; i++) {
-        slotsState[i] = {
-            characterName: chatCharacters[i],
-            usage: 0, // Начальный счетчик использования
-            cacheLoaded: false
-        };
+        slotsState[i] = createSlotWithCharacter(chatCharacters[i]);
     }
     
     console.debug(`[KV Cache Manager] Персонажи распределены по слотам:`, slotsState);
@@ -201,11 +204,7 @@ export async function acquireSlot(characterName, minUsageForSave = 1, protectedC
     if (freeSlotIndex !== -1) {
         // Найден пустой слот - устанавливаем персонажа туда (храним нормализованное имя)
         // Счетчик использования всегда начинается с 0, управление счетчиком вне этой функции
-        slotsState[freeSlotIndex] = {
-            characterName: characterName,
-            usage: 0,
-            cacheLoaded: false
-        };
+        slotsState[freeSlotIndex] = createSlotWithCharacter(characterName);
         console.debug(`[KV Cache Manager] Персонаж ${characterName} установлен в пустой слот ${freeSlotIndex}, счетчик: ${slotsState[freeSlotIndex].usage}`);
         updateSlotsList();
         return freeSlotIndex;
@@ -255,11 +254,7 @@ export async function acquireSlot(characterName, minUsageForSave = 1, protectedC
     // Устанавливаем персонажа в освобожденный слот
     // Храним нормализованное имя (characterName уже нормализован)
     // Счетчик использования всегда начинается с 0, управление счетчиком вне этой функции
-    slotsState[minUsageIndex] = {
-        characterName: characterName,
-        usage: 0,
-        cacheLoaded: false
-    };
+    slotsState[minUsageIndex] = createSlotWithCharacter(characterName);
     
     console.debug(`[KV Cache Manager] Персонаж ${characterName} установлен в слот ${minUsageIndex}${evictedCharacter ? ` (вытеснен ${evictedCharacter}, использование: ${minUsage})` : ' (свободный слот)'}, счетчик: ${slotsState[minUsageIndex].usage}`);
     
@@ -308,8 +303,9 @@ export async function updateSlotsList() {
             html += `<span>Слот <strong>${i}</strong>: `;
             
             if (isUsed) {
+                const messageCount = slot?.usage || 0;
                 html += `<span style="color: var(--SmartThemeBodyColor, inherit);">${characterName}</span> `;
-                html += `<span style="font-size: 0.85em; color: var(--SmartThemeBodyColor, #888);">[использовано: ${slot?.usage}]</span>`;
+                html += `<span style="font-size: 0.85em; color: var(--SmartThemeBodyColor, #888);">[сообщений: ${messageCount}]</span>`;
             } else {
                 html += `<span style="color: #888; font-style: italic;">(свободен)</span>`;
             }

@@ -2,7 +2,7 @@
 
 import { getContext } from "../../../extensions.js";
 import { normalizeCharacterName, formatTimestampToDate } from './utils.js';
-import { getSlotsState, acquireSlot, incrementSlotUsage } from './slot-manager.js';
+import { getSlotsState, acquireSlot } from './slot-manager.js';
 import { loadSlotCache } from './cache-operations.js';
 import { getLastCacheForCharacter } from './load-popup.js';
 import { parseSaveFilename } from './file-manager.js';
@@ -123,17 +123,10 @@ export async function KVCacheManagerInterceptor(chat, contextSize, abort, type) 
                 console.debug(`[KV Cache Manager] Кеш для персонажа ${characterName} уже загружен в слот ${currentSlot}, пропускаем загрузку`);
             }
             
-            // Увеличиваем счетчик использования только для новых генераций и регенераций
-            // При свайпе и продолжении не увеличиваем, если счетчик уже больше 0
-            const shouldIncrementUsage = (type === 'normal') || 
-                                         (slotsState[currentSlot].usage === 0);
-            
-            if (shouldIncrementUsage) {
-                incrementSlotUsage(currentSlot);
-                console.debug(`[KV Cache Manager] Счетчик использования для персонажа ${characterName} в слоте ${currentSlot} увеличен до: ${slotsState[currentSlot].usage} (тип: ${type})`);
-            } else {
-                console.debug(`[KV Cache Manager] Счетчик использования для персонажа ${characterName} в слоте ${currentSlot} не увеличен (тип: ${type}, текущее значение: ${slotsState[currentSlot].usage})`);
-            }
+            // Сохраняем тип генерации в слот для использования в processMessageForAutoSave
+            // Увеличение usage происходит в processMessageForAutoSave по событию MESSAGE_RECEIVED
+            slotsState[currentSlot].generationType = type;
+            console.debug(`[KV Cache Manager] Тип генерации ${type} сохранен для персонажа ${characterName} в слоте ${currentSlot}`);
         }
         
     } catch (error) {

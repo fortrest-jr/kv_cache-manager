@@ -3,7 +3,6 @@
 import { extension_settings } from "../../../extensions.js";
 import { saveSettingsDebounced } from "../../../../script.js";
 import { showToast } from './ui.js';
-import { updateNextSaveIndicator } from './auto-save.js';
 import { updateSlotsList } from './slot-manager.js';
 
 // Имя расширения должно совпадать с именем папки
@@ -43,8 +42,7 @@ export async function loadSettings() {
     $("#kv-cache-show-notifications").prop("checked", extensionSettings.showNotifications).trigger("input");
     $("#kv-cache-clear-on-chat-change").prop("checked", extensionSettings.clearOnChatChange).trigger("input");
     
-    // Обновляем индикатор и список слотов
-    updateNextSaveIndicator();
+    // Обновляем список слотов
     updateSlotsList();
 }
 
@@ -56,14 +54,12 @@ export function createSettingsHandlers() {
         const value = Boolean($(event.target).prop("checked"));
         extensionSettings.enabled = value;
         saveSettingsDebounced();
-        updateNextSaveIndicator();
     }
     
     function onSaveIntervalChange(event) {
         const value = parseInt($(event.target).val()) || 5;
         extensionSettings.saveInterval = value;
         saveSettingsDebounced();
-        updateNextSaveIndicator();
     }
     
     function onMaxFilesChange(event) {

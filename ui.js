@@ -5,7 +5,6 @@ import { getNormalizedChatId } from './utils.js';
 import { getSlotsState, initializeSlots } from './slot-manager.js';
 import { saveCache, saveCharacterCache } from './cache-operations.js';
 import { openLoadPopup } from './load-popup.js';
-import { updateNextSaveIndicator, resetChatCounters } from './auto-save.js';
 
 // Показ toast-уведомления
 export function showToast(type, message, title = 'KV Cache Manager') {
@@ -66,10 +65,9 @@ export async function onSaveNowButtonClick() {
     try {
         const success = await saveCache(false);
         if (success) {
-            // Сбрасываем счётчики всех персонажей текущего чата после успешного сохранения
-            const chatId = getNormalizedChatId();
-            resetChatCounters(chatId);
-            updateNextSaveIndicator();
+            // Обновляем отображение слотов после сохранения
+            const { updateSlotsList } = await import('./slot-manager.js');
+            updateSlotsList();
         }
     } finally {
         enableAllSaveButtons();

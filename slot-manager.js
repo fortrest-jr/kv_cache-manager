@@ -292,7 +292,7 @@ export async function updateSlotsList() {
             
             // Кнопка сохранения (только для занятых слотов)
             if (isUsed) {
-                html += `<button class="kv-cache-save-slot-button" data-slot-index="${i}" data-character-name="${characterName}" style="background: none; border: none; cursor: pointer; padding: 2px 4px; display: inline-flex; align-items: center; color: var(--SmartThemeBodyColor, #888);" title="Сохранить кеш для ${characterName}">`;
+                html += `<button class="kv-cache-save-slot-button" data-slot-index="${i}" data-character-name="${characterName}" style="background: none; cursor: pointer; padding: 2px 4px; display: inline-flex; align-items: center; color: var(--SmartThemeBodyColor, #888); margin-left: 0;" title="Сохранить кеш для ${characterName}">`;
                 html += `<i class="fa-solid fa-floppy-disk" style="font-size: 0.85em;"></i>`;
                 html += `</button>`;
             } else {

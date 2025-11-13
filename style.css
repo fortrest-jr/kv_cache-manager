@@ -71,6 +71,9 @@
 .kv-cache-save-slot-button {
     transition: all 0.2s ease;
     opacity: 0.7;
+    border: 1px solid var(--SmartThemeBorderColor, #ccc) !important;
+    border-radius: 4px;
+    margin-left: 0 !important;
 }
 
 .kv-cache-save-slot-button:hover:not(:disabled) {

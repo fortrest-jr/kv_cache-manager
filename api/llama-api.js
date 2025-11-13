@@ -1,7 +1,8 @@
 // API клиент для llama.cpp сервера
 // Содержит только описания эндпоинтов и базовую обработку ошибок
 
-import { textgen_types, textgenerationwebui_settings } from '../../../textgen-settings.js';
+import { textgen_types, textgenerationwebui_settings } from '../../../../textgen-settings.js';
+
 import HttpClient from './http-client.js';
 import { LLAMA_API_TIMEOUTS } from '../settings.js';
 

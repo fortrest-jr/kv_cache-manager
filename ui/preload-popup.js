@@ -1,9 +1,10 @@
 // Popup предзагрузки для KV Cache Manager
 
-import { getContext } from "../../../extensions.js";
+import { getContext } from "../../../../extensions.js";
+import { callGenericPopup, POPUP_TYPE, POPUP_RESULT } from '../../../../../scripts/popup.js';
+
 import { showToast } from './ui.js';
 import { extensionFolderPath } from '../settings.js';
-import { callGenericPopup, POPUP_TYPE, POPUP_RESULT } from '../../../../scripts/popup.js';
 import { getChatCharactersWithMutedStatus } from '../utils/character-utils.js';
 
 // Глобальные переменные для popup предзагрузки

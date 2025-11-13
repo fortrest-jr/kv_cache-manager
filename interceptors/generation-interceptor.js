@@ -1,6 +1,7 @@
 // Перехватчик генерации для KV Cache Manager
 
-import { getContext } from "../../../extensions.js";
+import { getContext } from "../../../../extensions.js";
+
 import { formatTimestampToDate } from '../utils/utils.js';
 import { getSlotsState, acquireSlot } from '../core/slot-manager.js';
 import { loadSlotCache } from '../core/cache-operations.js';

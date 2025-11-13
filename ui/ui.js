@@ -1,14 +1,14 @@
 // UI компоненты и уведомления для KV Cache Manager
 
+import { getContext } from "../../../../extensions.js";
+import { callGenericPopup, POPUP_TYPE, POPUP_RESULT } from '../../../../../scripts/popup.js';
+
 import { getExtensionSettings } from '../settings.js';
-import { getNormalizedChatId } from '../utils/utils.js';
 import { getSlotsState, initializeSlots } from '../core/slot-manager.js';
 import { saveCache, saveCharacterCache } from '../core/cache-operations.js';
 import { preloadCharactersCache } from './preload-cache.js';
 import { openLoadPopup } from './load-popup.js';
 import { openPreloadPopup } from './preload-popup.js';
-import { getContext } from "../../../extensions.js";
-import { callGenericPopup, POPUP_TYPE, POPUP_RESULT } from '../../../../scripts/popup.js';
 
 // Показ toast-уведомления
 export function showToast(type, message, title = 'KV Cache Manager') {

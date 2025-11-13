@@ -1,6 +1,6 @@
 // Утилиты и вспомогательные функции для KV Cache Manager
 
-import { getCurrentChatId } from "../../../../script.js";
+import { getCurrentChatId } from "../../../../../script.js";
 
 // Формирование timestamp для имени файла (YYYYMMDDHHMMSS)
 export function formatTimestamp(date = new Date()) {

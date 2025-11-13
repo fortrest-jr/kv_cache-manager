@@ -1,7 +1,8 @@
 // Управление слотами для KV Cache Manager
 
-import { getContext } from "../../../extensions.js";
-import { getGroupMembers, selected_group, groups } from '../../../group-chats.js';
+import { getContext } from "../../../../extensions.js";
+import { getGroupMembers, selected_group, groups } from '../../../../group-chats.js';
+
 import LlamaApi from '../api/llama-api.js';
 import { normalizeCharacterName, getNormalizedChatId } from '../utils/utils.js';
 import { showToast } from '../ui/ui.js';

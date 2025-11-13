@@ -1,7 +1,8 @@
 // Утилиты для работы с персонажами для KV Cache Manager
 
-import { getContext } from "../../../extensions.js";
-import { getGroupMembers, selected_group, groups } from '../../../group-chats.js';
+import { getContext } from "../../../../extensions.js";
+import { getGroupMembers, selected_group, groups } from '../../../../group-chats.js';
+
 import { normalizeCharacterName } from './utils.js';
 
 // Получение персонажей текущего чата с информацией о мьюте

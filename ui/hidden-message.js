@@ -1,7 +1,7 @@
 // Утилиты для работы со скрытыми сообщениями в чате
 
-import { getContext } from "../../../extensions.js";
-import { eventSource, event_types, chat, saveChatConditional, addOneMessage, updateMessageBlock } from "../../../../script.js";
+import { getContext } from "../../../../extensions.js";
+import { eventSource, event_types, chat, saveChatConditional, addOneMessage, updateMessageBlock } from "../../../../../script.js";
 
 
 // Создание невидимого сообщения для отслеживания прогресса

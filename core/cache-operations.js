@@ -1,12 +1,13 @@
 // Операции с кешем для KV Cache Manager
 
+import { getContext } from "../../../../extensions.js";
+
 import LlamaApi from '../api/llama-api.js';
 import { formatTimestamp, getNormalizedChatId } from '../utils/utils.js';
 import { generateSaveFilename, rotateCharacterFiles, validateCacheFile } from './file-manager.js';
 import { getAllSlotsInfo, getSlotsState, resetSlotUsage, setSlotCacheLoaded, getSlotsCountFromData, updateSlotsList } from './slot-manager.js';
 import { showToast, disableAllSaveButtons, enableAllSaveButtons } from '../ui/ui.js';
 import { getExtensionSettings, MIN_USAGE_FOR_SAVE } from '../settings.js';
-import { getContext } from "../../../extensions.js";
 
 // Инициализация API клиента
 const llamaApi = new LlamaApi();

@@ -1,7 +1,8 @@
 // Предзагрузка кеша для персонажей
 
-import { getContext } from "../../../extensions.js";
-import { generateQuietPrompt } from "../../../../script.js";
+import { getContext } from "../../../../extensions.js";
+import { generateQuietPrompt } from "../../../../../script.js";
+
 import { saveCharacterCache } from '../core/cache-operations.js';
 import { showToast, disableAllSaveButtons, enableAllSaveButtons } from './ui.js';
 import { setPreloadingMode, setCurrentPreloadCharacter, getCurrentSlot } from '../interceptors/generation-interceptor.js';

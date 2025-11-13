@@ -109,8 +109,6 @@ export async function getFilesList() {
 export async function deleteFile(filename) {
     try {
         await filePluginApi.deleteFile(filename);
-        
-        console.debug(`[KV Cache Manager] Файл удален: ${filename}`);
         return true;
     } catch (e) {
         console.warn(`[KV Cache Manager] Ошибка при удалении файла ${filename}:`, e);
@@ -134,29 +132,23 @@ export async function rotateFiles(filterFn, description, context) {
         // Парсим файлы один раз и фильтруем
         const filteredFiles = parseFilesList(filesList, parseSaveFilename).filter(filterFn);
         
-        console.debug(`[KV Cache Manager] Найдено ${filteredFiles.length} автосохранений ${description} (лимит: ${maxFiles})`);
-        
         // Сортируем по timestamp (от новых к старым)
         sortByTimestamp(filteredFiles);
         
         if (filteredFiles.length > maxFiles) {
             const filesToDelete = filteredFiles.slice(maxFiles);
-            console.debug(`[KV Cache Manager] Удаление ${filesToDelete.length} старых автосохранений ${description}`);
             
             let deletedCount = 0;
             for (const file of filesToDelete) {
                 const deleted = await deleteFile(file.name);
                 if (deleted) {
                     deletedCount++;
-                    console.debug(`[KV Cache Manager] Удален файл: ${file.name}`);
                 }
             }
             
             if (deletedCount > 0 && extensionSettings.showNotifications) {
                 showToast('warning', `Удалено ${deletedCount} старых автосохранений ${description}`, 'Ротация файлов');
             }
-        } else {
-            console.debug(`[KV Cache Manager] Ротация не требуется ${context}: ${filteredFiles.length} файлов <= ${maxFiles}`);
         }
     } catch (e) {
         console.error(`[KV Cache Manager] Ошибка при ротации файлов ${context}:`, e);
@@ -287,7 +279,6 @@ export async function getLastCacheForCharacter(characterName, currentChatOnly = 
         }
         
         if (characterFiles.length === 0) {
-            console.debug(`[KV Cache Manager] Не найдено кеша для персонажа ${characterName}${currentChatOnly ? ` в чате ${currentChatId}` : ''}`);
             return null;
         }
         
@@ -296,7 +287,6 @@ export async function getLastCacheForCharacter(characterName, currentChatOnly = 
         
         // Возвращаем самый последний файл
         const lastFile = characterFiles[0];
-        console.debug(`[KV Cache Manager] Найден последний кеш для персонажа ${characterName}: ${lastFile.filename}${currentChatOnly ? ` (в текущем чате)` : ' (во всех чатах)'}`);
         
         return {
             filename: lastFile.filename,

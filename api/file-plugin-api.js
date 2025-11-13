@@ -14,16 +14,6 @@ class FilePluginApi {
     }
 
     /**
-     * Базовое логирование запроса
-     * @param {string} method - HTTP метод
-     * @param {string} url - URL запроса
-     * @param {Object} params - Параметры запроса
-     */
-    _logRequest(method, url, params = {}) {
-        console.debug(`[FilePluginApi] ${method} ${url}`, params);
-    }
-
-    /**
      * Получение CSRF токена (кэшируется)
      * @param {Object} options - Опции запроса
      * @param {number} options.timeout - Таймаут в миллисекундах (по умолчанию 5000)
@@ -41,7 +31,6 @@ class FilePluginApi {
                 ...options
             };
             
-            this._logRequest('GET', url);
             const response = await this.httpClient.get(url, requestOptions);
 
             if (response && response.token) {
@@ -49,7 +38,7 @@ class FilePluginApi {
                 return this._csrfTokenCache;
             }
         } catch (e) {
-            // Без логирования - это базовая обработка, логирование должно быть выше
+            // Тихая обработка ошибки - возвращаем null
         }
 
         return null;
@@ -69,7 +58,6 @@ class FilePluginApi {
             ...options
         };
         
-        this._logRequest('GET', url);
         return await this.httpClient.get(url, requestOptions);
     }
 
@@ -95,7 +83,6 @@ class FilePluginApi {
             headers['X-CSRF-Token'] = csrfToken;
         }
 
-        this._logRequest('DELETE', url, { filename });
         return await this.httpClient.delete(url, {
             ...requestOptions,
             headers,

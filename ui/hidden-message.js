@@ -9,8 +9,6 @@ import { eventSource, event_types, chat, saveChatConditional, addOneMessage, upd
 // @param {string} name - Имя отправителя (по умолчанию 'System')
 // @returns {Promise<number>} - ID созданного сообщения
 export async function createHiddenMessage(text, isSmallSys = true, name = 'KV Cache Manager') {
-    console.debug('[KV Cache Manager] createHiddenMessage: начало создания сообщения', { name, textLength: text.length });
-    
     const context = getContext();
     const IGNORE_SYMBOL = context.symbols.ignore;
     
@@ -31,7 +29,6 @@ export async function createHiddenMessage(text, isSmallSys = true, name = 'KV Ca
     await saveChatConditional();
     
     const messageId = chat.length - 1;
-    console.debug('[KV Cache Manager] createHiddenMessage: сообщение добавлено в чат', { messageId, chatLength: chat.length });
     
     // Эмитим события
     await eventSource.emit(event_types.MESSAGE_SENT, messageId);
@@ -45,17 +42,13 @@ export async function createHiddenMessage(text, isSmallSys = true, name = 'KV Ca
         }
     }, 100);
     
-    console.debug('[KV Cache Manager] createHiddenMessage: события отправлены, возвращаем ID', { messageId });
-    
-    return messageId; // Возвращаем ID сообщения
+    return messageId;
 }
 
 // Обновление скрытого сообщения
 // @param {number} messageId - ID сообщения для обновления
 // @param {string} newText - Новый текст сообщения
 export async function editMessageUsingUpdate(messageId, newText) {
-    console.debug('[KV Cache Manager] editMessageUsingUpdate: начало обновления', { messageId, chatLength: chat.length, newTextLength: newText.length });
-    
     if (messageId < 0 || messageId >= chat.length) {
         console.error('[KV Cache Manager] Invalid message ID:', messageId, 'chat.length:', chat.length);
         return;
@@ -68,20 +61,8 @@ export async function editMessageUsingUpdate(messageId, newText) {
         return;
     }
     
-    const oldText = message.mes;
     message.mes = newText;
-    
-    console.debug('[KV Cache Manager] editMessageUsingUpdate: обновление текста сообщения', { 
-        messageId, 
-        oldTextLength: oldText?.length, 
-        newTextLength: newText.length,
-        messageExists: !!message
-    });
-    
     updateMessageBlock(messageId, message, { rerenderMessage: true });
-    console.debug('[KV Cache Manager] editMessageUsingUpdate: updateMessageBlock вызван');
-    
     await saveChatConditional();
-    console.debug('[KV Cache Manager] editMessageUsingUpdate: сообщение обновлено и сохранено', { messageId });
 }
 

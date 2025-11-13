@@ -15,7 +15,6 @@ export function showToast(type, message, title = 'KV Cache Manager') {
     const extensionSettings = getExtensionSettings();
     
     if (typeof toastr === 'undefined') {
-        console.debug(`[KV Cache Manager] ${title}: ${message}`);
         return;
     }
 

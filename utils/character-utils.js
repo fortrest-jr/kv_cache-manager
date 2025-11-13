@@ -35,13 +35,6 @@ export function getChatCharactersWithMutedStatus() {
         const group = groups?.find(x => x.id === selected_group);
         const disabledMembers = group?.disabled_members ?? [];
         
-        console.debug('[KV Cache Manager] Информация о группе:', {
-            selectedGroup: selected_group,
-            disabledMembers: disabledMembers,
-            disabledMembersLength: disabledMembers.length,
-            groupMembersAvatars: groupMembers.map(m => m?.avatar).filter(Boolean)
-        });
-        
         // Формируем массив персонажей с информацией о мьюте
         const characters = groupMembers
             .filter(member => member && member.name && typeof member.name === 'string')
@@ -49,12 +42,6 @@ export function getChatCharactersWithMutedStatus() {
                 const normalizedName = normalizeCharacterName(member.name);
                 // Проверяем, мьючен ли персонаж (проверяем наличие avatar в disabledMembers)
                 const isMuted = disabledMembers.includes(member.avatar);
-                
-                console.debug(`[KV Cache Manager] Персонаж ${member.name}:`, {
-                    avatar: member.avatar,
-                    isMuted: isMuted,
-                    disabledMembers: disabledMembers
-                });
                 
                 // Получаем characterId из контекста персонажей
                 let characterId = null;
@@ -76,7 +63,6 @@ export function getChatCharactersWithMutedStatus() {
                 };
             });
         
-        console.debug(`[KV Cache Manager] Получено ${characters.length} персонажей с информацией о мьюте (мьюченных: ${characters.filter(c => c.isMuted).length})`);
         return characters;
     } catch (e) {
         console.error('[KV Cache Manager] Ошибка при получении персонажей с информацией о мьюте:', e);

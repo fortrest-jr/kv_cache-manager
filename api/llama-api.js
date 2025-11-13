@@ -20,7 +20,6 @@ class LlamaApi {
      */
     _getBaseUrl() {
         const provided_url = textgenerationwebui_settings.server_urls[textgen_types.LLAMACPP];
-        console.debug('LlamaCpp server URL: ' + provided_url);
         return provided_url;
     }
 
@@ -37,16 +36,6 @@ class LlamaApi {
     }
 
     /**
-     * Базовое логирование запроса
-     * @param {string} method - HTTP метод
-     * @param {string} url - URL запроса
-     * @param {Object} params - Параметры запроса
-     */
-    _logRequest(method, url, params = {}) {
-        console.debug(`[LlamaApi] ${method} ${url}`, params);
-    }
-
-    /**
      * Получение информации о всех слотах
      * @param {Object} options - Опции запроса
      * @param {number} options.timeout - Таймаут в миллисекундах (по умолчанию 10000)
@@ -60,7 +49,6 @@ class LlamaApi {
             ...options
         };
         
-        this._logRequest('GET', url);
         return await this.httpClient.get(url, requestOptions);
     }
 
@@ -80,7 +68,6 @@ class LlamaApi {
             ...options
         };
         
-        this._logRequest('POST', url, { slotId, filename });
         return await this.httpClient.post(url, { filename }, requestOptions);
     }
 
@@ -100,7 +87,6 @@ class LlamaApi {
             ...options
         };
         
-        this._logRequest('POST', url, { slotId, filename });
         return await this.httpClient.post(url, { filename }, requestOptions);
     }
 
@@ -119,7 +105,6 @@ class LlamaApi {
             ...options
         };
         
-        this._logRequest('POST', url, { slotId });
         return await this.httpClient.post(url, null, requestOptions);
     }
 }

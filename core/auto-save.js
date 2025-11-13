@@ -73,16 +73,12 @@ export async function processMessageForAutoSave(data) {
         incrementSlotUsage(slotIndex);
         const newUsage = slot.usage;
         
-        console.debug(`[KV Cache Manager] Usage для персонажа ${characterName} в слоте ${slotIndex} увеличен до: ${newUsage} (тип: ${generationType})`);
-        
         // Проверяем необходимость автосохранения
         await checkAndPerformAutoSave(slotIndex, newUsage);
         
         // Обновляем отображение
         const { updateSlotsList } = await import('./slot-manager.js');
         updateSlotsList();
-    } else {
-        console.debug(`[KV Cache Manager] Usage для персонажа ${characterName} в слоте ${slotIndex} не увеличен (тип: ${generationType}, текущее значение: ${slot?.usage})`);
     }
     
     // Очищаем тип генерации после обработки

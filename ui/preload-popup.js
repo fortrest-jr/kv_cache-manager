@@ -60,18 +60,6 @@ export async function openPreloadPopup() {
         }
     });
     
-    console.debug('[KV Cache Manager] openPreloadPopup:', { 
-        charactersCount: characters.length,
-        selectedCount: preloadPopupData.selectedCharacters.size,
-        mutedCount: characters.filter(c => c.isMuted).length,
-        characters: characters.map(c => ({
-            name: c.name,
-            normalizedName: c.normalizedName,
-            isMuted: c.isMuted,
-            selected: preloadPopupData.selectedCharacters.has(c.normalizedName)
-        }))
-    });
-    
     // Загружаем HTML-контент из файла
     const popupHTML = await $.get(`${extensionFolderPath}/preload-popup.html`);
     
@@ -113,11 +101,6 @@ export async function openPreloadPopup() {
                     console.error('[KV Cache Manager] Не найден контент popup в', popup.content);
                     return;
                 }
-                
-                console.debug('[KV Cache Manager] Popup предзагрузки открыт, инициализация...', {
-                    hasContent: !!popupContent,
-                    charactersList: !!popupContent.querySelector('#kv-cache-preload-characters-list')
-                });
                 
                 setupPreloadPopupHandlers();
                 
@@ -170,11 +153,6 @@ export function renderPreloadPopupCharacters(context = document) {
     
     const characters = preloadPopupData.characters;
     const searchQuery = preloadPopupData.searchQuery.toLowerCase();
-    
-    console.debug('[KV Cache Manager] renderPreloadPopupCharacters:', { 
-        charactersCount: characters.length, 
-        searchQuery: searchQuery 
-    });
     
     if (characters.length === 0) {
         charactersList.html('<div class="kv-cache-preload-empty">Нет персонажей для предзагрузки</div>');

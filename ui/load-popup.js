@@ -67,13 +67,6 @@ export async function openLoadPopup() {
     loadPopupData.selectedCharacters = {};
     loadPopupData.searchQuery = '';
     
-    console.debug('[KV Cache Manager] openLoadPopup:', { 
-        filesCount: filesList.length, 
-        chatsCount: Object.keys(loadPopupData.chats).length,
-        currentChatId: loadPopupData.currentChatId,
-        chats: loadPopupData.chats 
-    });
-    
     // Загружаем HTML-контент из файла
     const popupHTML = await $.get(`${extensionFolderPath}/load-popup.html`);
     
@@ -116,13 +109,6 @@ export async function openLoadPopup() {
                     console.error('[KV Cache Manager] Не найден контент popup в', popup.content);
                     return;
                 }
-                
-                console.debug('[KV Cache Manager] Popup открыт, инициализация...', {
-                    hasContent: !!popupContent,
-                    chatsList: !!popupContent.querySelector('#kv-cache-load-chats-list'),
-                    filesList: !!popupContent.querySelector('#kv-cache-load-files-list'),
-                    dlg: popup.dlg
-                });
                 
                 setupLoadPopupHandlers();
                 
@@ -177,8 +163,6 @@ export function renderLoadPopupChats(context = document) {
     
     const currentChatId = loadPopupData.currentChatId;
     const chats = loadPopupData.chats;
-    
-    console.debug('[KV Cache Manager] renderLoadPopupChats:', { currentChatId, chatsCount: Object.keys(chats).length, chats });
     
     // Обновляем ID и счетчик для текущего чата
     const currentChatCharacters = chats[currentChatId] || {};
@@ -260,8 +244,6 @@ export function renderLoadPopupFiles(chatId, context = document) {
     const chats = loadPopupData.chats;
     const chatCharacters = chats[chatId] || {};
     const searchQuery = loadPopupData.searchQuery.toLowerCase();
-    
-    console.debug('[KV Cache Manager] renderLoadPopupFiles:', { chatId, charactersCount: Object.keys(chatCharacters).length, chatCharacters });
     
     const characterNames = Object.keys(chatCharacters);
     
@@ -500,7 +482,6 @@ export async function loadSelectedCache() {
             }
             
             characterSlotMap.set(character.characterName, slotIndex);
-            console.debug(`[KV Cache Manager] Персонаж ${character.characterName} распределен в слот ${slotIndex}`);
         } catch (e) {
             console.error(`[KV Cache Manager] Ошибка при распределении персонажа ${character.characterName}:`, e);
             errors.push(`${character.characterName}: ${e.message}`);
@@ -522,7 +503,6 @@ export async function loadSelectedCache() {
             
             if (loaded) {
                 loadedCount++;
-                console.debug(`[KV Cache Manager] Загружен кеш для персонажа ${character.characterName} в слот ${slotIndex}`);
                 
                 // Парсим имя файла один раз для получения информации о чате
                 const parsed = parseSaveFilename(character.fileToLoad.filename);

@@ -37,6 +37,14 @@ export async function createHiddenMessage(text, isSmallSys = true, name = 'KV Ca
     await eventSource.emit(event_types.MESSAGE_SENT, messageId);
     await eventSource.emit(event_types.USER_MESSAGE_RENDERED, messageId);
     
+    // Устанавливаем левое выравнивание для текста сообщения
+    setTimeout(() => {
+        const messageElement = $('#chat').find(`[mesid="${messageId}"]`);
+        if (messageElement.length > 0) {
+            messageElement.find('.mes_text').css('text-align', 'left');
+        }
+    }, 100);
+    
     console.debug('[KV Cache Manager] createHiddenMessage: события отправлены, возвращаем ID', { messageId });
     
     return messageId; // Возвращаем ID сообщения

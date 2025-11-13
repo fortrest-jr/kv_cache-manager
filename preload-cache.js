@@ -5,7 +5,7 @@ import { eventSource, event_types, generateQuietPrompt } from "../../../../scrip
 import { acquireSlot, updateSlotsList } from './slot-manager.js';
 import { saveCharacterCache } from './cache-operations.js';
 import { showToast, disableAllSaveButtons, enableAllSaveButtons } from './ui.js';
-import { setPreloadingMode, setCurrentPreloadCharacter } from './generation-interceptor.js';
+import { setPreloadingMode, setCurrentPreloadCharacter, getNormalizedCharacterNameFromData } from './generation-interceptor.js';
 import { createHiddenMessage, editMessageUsingUpdate } from './hidden-message.js';
 
 // Обновление обработчика кнопки отмены
@@ -99,32 +99,10 @@ export async function preloadCharactersCache(characters) {
     
     // Функция для остановки генерации
     const stopGeneration = (generationTask = null) => {
-        try {
-            const context = getContext();
-            
-            if (!context) {
-                console.warn('[KV Cache Manager] Контекст не найден, невозможно остановить генерацию');
-                return false;
-            }
-            
-            if (typeof context.stopGeneration !== 'function') {
-                console.warn('[KV Cache Manager] Метод context.stopGeneration() не доступен');
-                return false;
-            }
-            
-            const stopped = context.stopGeneration();
-            
-            if (stopped) {
-                console.debug('[KV Cache Manager] Генерация успешно остановлена через context.stopGeneration()');
-                return true;
-            } else {
-                console.warn('[KV Cache Manager] context.stopGeneration() вернул false, генерация не остановлена');
-                return false;
-            }
-        } catch (e) {
-            console.error('[KV Cache Manager] Ошибка при остановке генерации через context.stopGeneration():', e);
-            return false;
-        }
+        const context = getContext();
+        const stopped = context.stopGeneration();
+        console.debug('[KV Cache Manager] Генерация остановлена через context.stopGeneration(), результат:', stopped);
+        return stopped;
     };
     
     // Функция для обработки отмены
@@ -137,12 +115,7 @@ export async function preloadCharactersCache(characters) {
         console.debug('[KV Cache Manager] Предзагрузка отменена пользователем');
         
         // Останавливаем текущую генерацию
-        const stopped = stopGeneration();
-        if (stopped) {
-            console.debug('[KV Cache Manager] Генерация успешно остановлена при отмене пользователем');
-        } else {
-            console.warn('[KV Cache Manager] Не удалось остановить генерацию при отмене пользователем');
-        }
+        stopGeneration();
         
         if (statusMessageId !== null) {
             const status = formatPreloadStatus(
@@ -256,27 +229,35 @@ export async function preloadCharactersCache(characters) {
                     console.debug(`[KV Cache Manager] Статус обновлен для персонажа ${characterName}`);
                 }
                 
-                // Создаем Promise для ожидания события GENERATION_AFTER_COMMANDS
-                let generationStarted = false;
+                // Создаем Promise для ожидания события MESSAGE_RECEIVED
+                // Так как мы генерируем только 1 токен, генерация будет быстрой
+                let messageReceived = false;
                 let abortHandler = null;
                 
                 const generationPromise = new Promise((resolve, reject) => {
                     const timeout = setTimeout(() => {
-                        if (!generationStarted) {
-                            console.warn(`[KV Cache Manager] [${characterName}] Таймаут ожидания события GENERATION_AFTER_COMMANDS (30 сек)`);
+                        if (!messageReceived) {
+                            console.warn(`[KV Cache Manager] [${characterName}] Таймаут ожидания события MESSAGE_RECEIVED (30 сек)`);
                             // Отписываемся от события при таймауте
                             if (abortHandler) {
-                                eventSource.removeListener(event_types.GENERATION_AFTER_COMMANDS, abortHandler);
+                                eventSource.removeListener(event_types.MESSAGE_RECEIVED, abortHandler);
                             }
-                            reject(new Error('Таймаут ожидания начала генерации'));
+                            reject(new Error('Таймаут ожидания сообщения'));
                         }
                     }, 30000); // 30 секунд таймаут
                     
                     // Создаем обработчик и сохраняем ссылку на него
-                    const handler = () => {
-                        console.debug(`[KV Cache Manager] [${characterName}] Обработчик GENERATION_AFTER_COMMANDS вызван:`, {
+                    const handler = (data) => {
+                        // Проверяем, что это сообщение от нужного персонажа
+                        const messageCharacterName = getNormalizedCharacterNameFromData(data);
+                        if (messageCharacterName !== normalizedName) {
+                            // Это сообщение от другого персонажа, игнорируем
+                            return;
+                        }
+                        
+                        console.debug(`[KV Cache Manager] [${characterName}] Обработчик MESSAGE_RECEIVED вызван:`, {
                             isCancelled,
-                            generationStarted,
+                            messageReceived,
                             hasCurrentTask: !!currentGenerationTask
                         });
                         
@@ -284,37 +265,29 @@ export async function preloadCharactersCache(characters) {
                         if (isCancelled) {
                             console.debug(`[KV Cache Manager] [${characterName}] Отмена в обработчике события`);
                             clearTimeout(timeout);
-                            eventSource.removeListener(event_types.GENERATION_AFTER_COMMANDS, handler);
+                            eventSource.removeListener(event_types.MESSAGE_RECEIVED, handler);
                             // Останавливаем генерацию при отмене
-                            const stopped = stopGeneration(currentGenerationTask);
-                            if (stopped) {
-                                console.debug(`[KV Cache Manager] [${characterName}] Генерация успешно остановлена при отмене`);
-                            }
+                            stopGeneration(currentGenerationTask);
                             reject(new Error('Отменено пользователем'));
                             return;
                         }
                         
                         // Проверяем, что обработчик еще не был вызван
-                        if (generationStarted) {
+                        if (messageReceived) {
                             console.warn(`[KV Cache Manager] [${characterName}] Обработчик уже был вызван ранее, игнорируем повторный вызов`);
                             return;
                         }
                         
-                        generationStarted = true;
+                        messageReceived = true;
                         clearTimeout(timeout);
-                        console.debug(`[KV Cache Manager] [${characterName}] Генерация началась, отписываемся от события`);
+                        console.debug(`[KV Cache Manager] [${characterName}] Сообщение получено, отписываемся от события`);
                         
                         // Отписываемся от события (передаем ту же функцию, что использовалась при подписке)
-                        eventSource.removeListener(event_types.GENERATION_AFTER_COMMANDS, handler);
+                        eventSource.removeListener(event_types.MESSAGE_RECEIVED, handler);
                         
-                        // Останавливаем генерацию после обработки промпта
-                        const stopped = stopGeneration(currentGenerationTask);
-                        if (stopped) {
-                            console.debug(`[KV Cache Manager] [${characterName}] Генерация успешно остановлена после обработки промпта`);
-                        } else {
-                            console.warn(`[KV Cache Manager] [${characterName}] Не удалось остановить генерацию после обработки промпта`);
-                        }
-                        
+                        // Останавливаем генерацию после получения сообщения
+                        stopGeneration(currentGenerationTask);
+                        console.debug(`[KV Cache Manager] [${characterName}] Генерация остановлена после получения сообщения`);
                         resolve();
                     };
                     
@@ -322,8 +295,8 @@ export async function preloadCharactersCache(characters) {
                     abortHandler = handler;
                     
                     // Подписываемся на событие
-                    console.debug(`[KV Cache Manager] [${characterName}] Подписка на событие GENERATION_AFTER_COMMANDS`);
-                    eventSource.on(event_types.GENERATION_AFTER_COMMANDS, handler);
+                    console.debug(`[KV Cache Manager] [${characterName}] Подписка на событие MESSAGE_RECEIVED`);
+                    eventSource.on(event_types.MESSAGE_RECEIVED, handler);
                 });
                 
                 try {
@@ -362,7 +335,7 @@ export async function preloadCharactersCache(characters) {
                         hasThen: currentGenerationTask && typeof currentGenerationTask.then === 'function'
                     });
                     
-                    // Ждем события GENERATION_AFTER_COMMANDS (это произойдет раньше, чем завершится генерация)
+                    // Ждем события MESSAGE_RECEIVED (сообщение будет получено после генерации 1 токена)
                     // Проверяем флаг отмены во время ожидания
                     console.debug(`[KV Cache Manager] [${characterName}] Ожидание Promise.race (generationPromise vs cancelCheckPromise)`);
                     
@@ -374,13 +347,10 @@ export async function preloadCharactersCache(characters) {
                                 clearInterval(cancelCheckInterval);
                                 // Отписываемся от события при отмене
                                 if (abortHandler) {
-                                    eventSource.removeListener(event_types.GENERATION_AFTER_COMMANDS, abortHandler);
+                                    eventSource.removeListener(event_types.MESSAGE_RECEIVED, abortHandler);
                                 }
                                 // Останавливаем генерацию
-                                const stopped = stopGeneration(currentGenerationTask);
-                                if (stopped) {
-                                    console.debug(`[KV Cache Manager] [${characterName}] Генерация успешно остановлена при отмене в cancelCheckInterval`);
-                                }
+                                stopGeneration(currentGenerationTask);
                                 resolve('cancelled');
                             }
                         }, 100);
@@ -418,25 +388,12 @@ export async function preloadCharactersCache(characters) {
                     if (isCancelled || result === 'cancelled') {
                         console.debug(`[KV Cache Manager] [${characterName}] Предзагрузка отменена после генерации`);
                         // Дополнительная попытка остановить генерацию
-                        const stopped = stopGeneration(currentGenerationTask);
-                        if (stopped) {
-                            console.debug(`[KV Cache Manager] [${characterName}] Генерация успешно остановлена при отмене после генерации`);
-                        }
+                        stopGeneration(currentGenerationTask);
                         break;
                     }
                     
-                    // Останавливаем генерацию после обработки промпта
-                    console.debug(`[KV Cache Manager] [${characterName}] Остановка генерации после обработки промпта`);
-                    const stopped = stopGeneration(currentGenerationTask);
-                    if (stopped) {
-                        console.debug(`[KV Cache Manager] [${characterName}] Генерация успешно остановлена после обработки промпта`);
-                    } else {
-                        console.warn(`[KV Cache Manager] [${characterName}] Не удалось остановить генерацию после обработки промпта`);
-                    }
-                    
-                    // Ждем немного, чтобы генерация точно остановилась
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                    console.debug(`[KV Cache Manager] [${characterName}] Завершено ожидание остановки генерации`);
+                    // Генерация уже остановлена в обработчике MESSAGE_RECEIVED
+                    console.debug(`[KV Cache Manager] [${characterName}] Предзагрузка завершена, сообщение получено`);
                     
                 } catch (e) {
                     // Если ошибка связана с остановкой генерации - это нормально
@@ -461,14 +418,14 @@ export async function preloadCharactersCache(characters) {
                     
                     console.debug(`[KV Cache Manager] [${characterName}] Блок finally, очистка:`, {
                         hasAbortHandler: !!abortHandler,
-                        generationStarted,
+                        messageReceived,
                         hasCurrentTask: !!currentGenerationTask
                     });
                     
                     // Убеждаемся, что обработчик удален (передаем ту же функцию, что использовалась при подписке)
-                    if (abortHandler && !generationStarted) {
-                        console.debug(`[KV Cache Manager] [${characterName}] Удаление обработчика события (generationStarted=false)`);
-                        eventSource.removeListener(event_types.GENERATION_AFTER_COMMANDS, abortHandler);
+                    if (abortHandler && !messageReceived) {
+                        console.debug(`[KV Cache Manager] [${characterName}] Удаление обработчика события (messageReceived=false)`);
+                        eventSource.removeListener(event_types.MESSAGE_RECEIVED, abortHandler);
                     }
                     // Сбрасываем ссылку на задачу генерации
                     currentGenerationTask = null;

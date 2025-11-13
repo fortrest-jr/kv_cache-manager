@@ -22,16 +22,17 @@ function setupPreloadPopupHandlers() {
         updateSearchQuery(query, popupDlg.length ? popupDlg[0] : document);
     });
     
-    // Обработчик "Выбрать всех"
-    $(document).off('click', '#kv-cache-preload-select-all').on('click', '#kv-cache-preload-select-all', function() {
+    // Обработчик чекбокса "Выбрать всех"
+    $(document).off('change', '#kv-cache-preload-select-all-checkbox').on('change', '#kv-cache-preload-select-all-checkbox', function() {
+        const isChecked = $(this).is(':checked');
         const popupDlg = $(this).closest('.popup, dialog');
-        selectAllCharacters(popupDlg.length ? popupDlg[0] : document);
-    });
-    
-    // Обработчик "Снять выбор со всех"
-    $(document).off('click', '#kv-cache-preload-deselect-all').on('click', '#kv-cache-preload-deselect-all', function() {
-        const popupDlg = $(this).closest('.popup, dialog');
-        deselectAllCharacters(popupDlg.length ? popupDlg[0] : document);
+        const context = popupDlg.length ? popupDlg[0] : document;
+        
+        if (isChecked) {
+            selectAllCharacters(context);
+        } else {
+            deselectAllCharacters(context);
+        }
     });
 }
 
@@ -227,12 +228,46 @@ export function renderPreloadPopupCharacters(context = document) {
                 preloadPopupData.selectedCharacters.delete(normalizedName);
             }
             
-            // Обновляем UI
+            // Обновляем чекбокс "Выбрать всех" в зависимости от состояния всех чекбоксов
             const popupDlg = $(this).closest('.popup, dialog');
-            updatePreloadPopupSelection(popupDlg.length ? popupDlg[0] : document);
+            const context = popupDlg.length ? popupDlg[0] : document;
+            updateSelectAllCheckbox(context);
+            
+            // Обновляем UI
+            updatePreloadPopupSelection(context);
         });
         
         charactersList.append(characterElement);
+    }
+    
+    // Обновляем чекбокс "Выбрать всех" после рендеринга
+    updateSelectAllCheckbox(context);
+}
+
+// Обновление чекбокса "Выбрать всех" в зависимости от состояния всех чекбоксов
+function updateSelectAllCheckbox(context = document) {
+    const allCheckboxes = $(context).find('.kv-cache-preload-character-checkbox');
+    const checkedCheckboxes = $(context).find('.kv-cache-preload-character-checkbox:checked');
+    const selectAllCheckbox = $(context).find('#kv-cache-preload-select-all-checkbox');
+    
+    if (allCheckboxes.length === 0) {
+        selectAllCheckbox.prop('checked', false);
+        selectAllCheckbox.prop('indeterminate', false);
+        return;
+    }
+    
+    if (checkedCheckboxes.length === 0) {
+        // Ничего не выбрано
+        selectAllCheckbox.prop('checked', false);
+        selectAllCheckbox.prop('indeterminate', false);
+    } else if (checkedCheckboxes.length === allCheckboxes.length) {
+        // Все выбраны
+        selectAllCheckbox.prop('checked', true);
+        selectAllCheckbox.prop('indeterminate', false);
+    } else {
+        // Частично выбраны
+        selectAllCheckbox.prop('checked', false);
+        selectAllCheckbox.prop('indeterminate', true);
     }
 }
 
@@ -244,6 +279,9 @@ export function updatePreloadPopupSelection(context = document) {
     if (selectedInfo.length === 0) {
         return; // Popup не открыт
     }
+    
+    // Обновляем чекбокс "Выбрать всех"
+    updateSelectAllCheckbox(context);
     
     // Используем popup.okButton для управления кнопкой
     const preloadButton = preloadPopupData.currentPopup?.okButton;
@@ -270,14 +308,25 @@ export function updatePreloadPopupSelection(context = document) {
     }
 }
 
-// Выбрать всех персонажей
+// Выбрать всех персонажей (только немьюченных)
 function selectAllCharacters(context = document) {
+    // Выбираем только немьюченных персонажей
     preloadPopupData.characters.forEach(char => {
-        preloadPopupData.selectedCharacters.add(char.normalizedName);
+        if (!char.isMuted) {
+            preloadPopupData.selectedCharacters.add(char.normalizedName);
+        }
     });
     
-    // Обновляем чекбоксы
-    $(context).find('.kv-cache-preload-character-checkbox').prop('checked', true);
+    // Обновляем чекбоксы персонажей (только видимые)
+    $(context).find('.kv-cache-preload-character-checkbox').each(function() {
+        const normalizedName = $(this).data('character-name');
+        if (preloadPopupData.selectedCharacters.has(normalizedName)) {
+            $(this).prop('checked', true);
+        }
+    });
+    
+    // Обновляем чекбокс "Выбрать всех"
+    updateSelectAllCheckbox(context);
     
     // Обновляем информацию
     updatePreloadPopupSelection(context);
@@ -287,8 +336,11 @@ function selectAllCharacters(context = document) {
 function deselectAllCharacters(context = document) {
     preloadPopupData.selectedCharacters.clear();
     
-    // Обновляем чекбоксы
+    // Обновляем чекбоксы персонажей (только видимые)
     $(context).find('.kv-cache-preload-character-checkbox').prop('checked', false);
+    
+    // Обновляем чекбокс "Выбрать всех"
+    updateSelectAllCheckbox(context);
     
     // Обновляем информацию
     updatePreloadPopupSelection(context);

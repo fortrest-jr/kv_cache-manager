@@ -8,8 +8,10 @@
     <!-- Основная область с персонажами -->
     <div class="kv-cache-preload-content">
         <div class="kv-cache-preload-controls">
-            <button type="button" id="kv-cache-preload-select-all" class="menu_button" style="margin-right: 10px;">Выбрать всех</button>
-            <button type="button" id="kv-cache-preload-deselect-all" class="menu_button">Снять выбор со всех</button>
+            <label style="display: flex; align-items: center; cursor: pointer; padding: 8px;">
+                <input type="checkbox" id="kv-cache-preload-select-all-checkbox" style="margin-right: 10px;" />
+                <span>Выбрать всех</span>
+            </label>
         </div>
         <div id="kv-cache-preload-characters-list">
             <p class="kv-cache-preload-empty">

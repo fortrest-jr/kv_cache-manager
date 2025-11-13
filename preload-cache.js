@@ -62,9 +62,16 @@ export async function preloadCharactersCache(characters) {
     const errors = [];
     
     try {
+        console.debug('[KV Cache Manager] Начало предзагрузки:', {
+            totalCharacters: characters.length,
+            characters: characters.map(c => ({ name: c.name, normalizedName: c.normalizedName, isMuted: c.isMuted }))
+        });
+        
         // Создаем начальное сообщение
         const initialStatus = formatPreloadStatus(0, characters.length, [], []);
+        console.debug('[KV Cache Manager] Создание начального сообщения статуса...');
         statusMessageId = await createHiddenMessage(initialStatus, 'KV Cache Manager');
+        console.debug('[KV Cache Manager] Сообщение статуса создано, ID:', statusMessageId);
         
         // Обрабатываем каждого персонажа последовательно
         for (let i = 0; i < characters.length; i++) {
@@ -87,7 +94,9 @@ export async function preloadCharactersCache(characters) {
                 // Обновляем статус перед началом обработки персонажа
                 if (statusMessageId !== null) {
                     const status = formatPreloadStatus(i, characters.length, preloaded, errors);
+                    console.debug(`[KV Cache Manager] Обновление статуса перед персонажем ${i + 1}/${characters.length}:`, { characterName, statusMessageId });
                     await editMessageUsingUpdate(statusMessageId, status);
+                    console.debug(`[KV Cache Manager] Статус обновлен для персонажа ${characterName}`);
                 }
                 
                 // Получаем/занимаем слот для персонажа
@@ -186,7 +195,9 @@ export async function preloadCharactersCache(characters) {
                 // Обновляем статус после обработки персонажа
                 if (statusMessageId !== null) {
                     const status = formatPreloadStatus(i + 1, characters.length, preloaded, errors);
+                    console.debug(`[KV Cache Manager] Обновление статуса после персонажа ${i + 1}/${characters.length}:`, { characterName, statusMessageId, saved });
                     await editMessageUsingUpdate(statusMessageId, status);
+                    console.debug(`[KV Cache Manager] Статус обновлен после обработки ${characterName}`);
                 }
                 
             } catch (e) {
@@ -196,7 +207,9 @@ export async function preloadCharactersCache(characters) {
                 // Обновляем статус при ошибке
                 if (statusMessageId !== null) {
                     const status = formatPreloadStatus(i + 1, characters.length, preloaded, errors);
+                    console.debug(`[KV Cache Manager] Обновление статуса при ошибке для персонажа ${i + 1}/${characters.length}:`, { characterName, statusMessageId, error: e.message });
                     await editMessageUsingUpdate(statusMessageId, status);
+                    console.debug(`[KV Cache Manager] Статус обновлен после ошибки для ${characterName}`);
                 }
             }
         }
@@ -204,7 +217,11 @@ export async function preloadCharactersCache(characters) {
         // Финальное обновление статуса
         if (statusMessageId !== null) {
             const finalStatus = formatPreloadStatus(characters.length, characters.length, preloaded, errors);
+            console.debug('[KV Cache Manager] Финальное обновление статуса:', { statusMessageId, preloadedCount: preloaded.length, errorsCount: errors.length });
             await editMessageUsingUpdate(statusMessageId, finalStatus);
+            console.debug('[KV Cache Manager] Финальный статус обновлен');
+        } else {
+            console.warn('[KV Cache Manager] statusMessageId равен null, финальное обновление не выполнено');
         }
         
         // Показываем финальный тост

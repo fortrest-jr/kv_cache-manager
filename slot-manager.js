@@ -1,7 +1,7 @@
 // Управление слотами для KV Cache Manager
 
 import { getContext } from "../../../extensions.js";
-import { getGroupMembers } from '../../../group-chats.js';
+import { getGroupMembers, selected_group, groups } from '../../../group-chats.js';
 import LlamaApi from './llama-api.js';
 import { normalizeCharacterName, getNormalizedChatId } from './utils.js';
 import { showToast } from './ui.js';
@@ -99,7 +99,7 @@ export function getChatCharactersWithMutedStatus() {
         }
         
         // Групповой чат
-        const groupMembers = getGroupMembers(context.groupId);
+        const groupMembers = getGroupMembers();
         
         if (!groupMembers || groupMembers.length === 0) {
             console.warn('[KV Cache Manager] Не найдено участников группового чата');
@@ -107,25 +107,13 @@ export function getChatCharactersWithMutedStatus() {
         }
         
         // Получаем информацию о мьюченных персонажах
-        // groups и selected_group - глобальные переменные SillyTavern
-        let disabledAvatars = [];
-        
-        try {
-            if (typeof groups !== 'undefined' && Array.isArray(groups) && typeof selected_group !== 'undefined') {
-                const group = groups.find(x => x && x.id === selected_group);
-                if (group && Array.isArray(group.disabled_members)) {
-                    disabledAvatars = group.disabled_members;
-                }
-            }
-        } catch (e) {
-            console.warn('[KV Cache Manager] Ошибка при получении информации о мьюченных персонажах:', e);
-        }
+        const group = groups?.find(x => x.id === selected_group);
+        const disabledMembers = group?.disabled_members ?? [];
         
         console.debug('[KV Cache Manager] Информация о группе:', {
-            hasGroups: typeof groups !== 'undefined',
-            selectedGroup: typeof selected_group !== 'undefined' ? selected_group : 'undefined',
-            disabledAvatars: disabledAvatars,
-            disabledAvatarsLength: disabledAvatars.length,
+            selectedGroup: selected_group,
+            disabledMembers: disabledMembers,
+            disabledMembersLength: disabledMembers.length,
             groupMembersAvatars: groupMembers.map(m => m?.avatar).filter(Boolean)
         });
         
@@ -134,14 +122,13 @@ export function getChatCharactersWithMutedStatus() {
             .filter(member => member && member.name && typeof member.name === 'string')
             .map(member => {
                 const normalizedName = normalizeCharacterName(member.name);
-                // Проверяем, мьючен ли персонаж (сравниваем avatar как строки)
-                const memberAvatar = String(member.avatar || '');
-                const isMuted = disabledAvatars.some(disabledAvatar => String(disabledAvatar) === memberAvatar);
+                // Проверяем, мьючен ли персонаж (проверяем наличие avatar в disabledMembers)
+                const isMuted = disabledMembers.includes(member.avatar);
                 
                 console.debug(`[KV Cache Manager] Персонаж ${member.name}:`, {
-                    avatar: memberAvatar,
+                    avatar: member.avatar,
                     isMuted: isMuted,
-                    disabledAvatars: disabledAvatars
+                    disabledMembers: disabledMembers
                 });
                 
                 // Получаем characterId из контекста персонажей
@@ -198,7 +185,7 @@ export function getNormalizedChatCharacters() {
         } else {
             // Групповой чат
             // Используем getGroupMembers() для получения массива объектов персонажей
-            const groupMembers = getGroupMembers(context.groupId);
+            const groupMembers = getGroupMembers();
             
             if (!groupMembers || groupMembers.length === 0) {
                 console.warn('[KV Cache Manager] Не найдено участников группового чата');

@@ -17,14 +17,15 @@ export async function createHiddenMessage(text, name = 'System') {
     const message = {
         name: name,
         is_user: false,
-        is_system: false,
+        is_system: true,
         send_date: context.humanizedDateTime(),
         mes: text,
         extra: {
-            [IGNORE_SYMBOL]: true,
+            // [IGNORE_SYMBOL]: true,
             gen_id: Date.now(),
-            api: 'manual',
-            model: 'hidden message',
+            // api: 'manual',
+            // model: 'hidden message',
+            isSmallSys: true,
         },
     };
     

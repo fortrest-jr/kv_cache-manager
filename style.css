@@ -448,3 +448,46 @@
     margin-top: 15px;
 }
 
+/* Стили для кнопки отмены в сообщении с прогрессом */
+/* Применяем стили menu_button к кнопке в сообщении */
+/* Используем универсальный селектор для всех кнопок с этим ID */
+#chat [id^="kv-cache-preload-cancel-btn-"],
+.chat [id^="kv-cache-preload-cancel-btn-"],
+.message [id^="kv-cache-preload-cancel-btn-"],
+button[id^="kv-cache-preload-cancel-btn-"] {
+    display: inline-block !important;
+    padding: 8px 16px !important;
+    margin-top: 10px !important;
+    cursor: pointer !important;
+    border: 1px solid var(--SmartThemeBorderColor, #ccc) !important;
+    border-radius: 4px !important;
+    background: var(--SmartThemeBlurTintColor, #4a9eff) !important;
+    color: var(--SmartThemeBodyColor, #fff) !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    transition: all 0.2s !important;
+    font-family: inherit !important;
+    text-align: center !important;
+    text-decoration: none !important;
+    box-sizing: border-box !important;
+    min-width: auto !important;
+    width: auto !important;
+}
+
+#chat [id^="kv-cache-preload-cancel-btn-"]:hover,
+.chat [id^="kv-cache-preload-cancel-btn-"]:hover,
+.message [id^="kv-cache-preload-cancel-btn-"]:hover,
+button[id^="kv-cache-preload-cancel-btn-"]:hover {
+    opacity: 0.9 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+}
+
+#chat [id^="kv-cache-preload-cancel-btn-"]:active,
+.chat [id^="kv-cache-preload-cancel-btn-"]:active,
+.message [id^="kv-cache-preload-cancel-btn-"]:active,
+button[id^="kv-cache-preload-cancel-btn-"]:active {
+    transform: translateY(0) !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2) !important;
+}
+

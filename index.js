@@ -3,11 +3,11 @@
 import { eventSource, event_types } from "../../../../script.js";
 
 import { loadSettings, createSettingsHandlers, extensionFolderPath } from './settings.js';
-import { onSaveButtonClick, onSaveNowButtonClick, onLoadButtonClick, onReleaseAllSlotsButtonClick, onSaveSlotButtonClick, onPreloadCharactersButtonClick } from './ui.js';
-import { initializeSlots, updateSlotsList, redistributeCharacters, initializePreviousChatId } from './slot-manager.js';
-import { processMessageForAutoSave } from './auto-save.js';
+import { onSaveButtonClick, onSaveNowButtonClick, onLoadButtonClick, onReleaseAllSlotsButtonClick, onSaveSlotButtonClick, onPreloadCharactersButtonClick } from './ui/ui.js';
+import { initializeSlots, updateSlotsList, redistributeCharacters, initializePreviousChatId } from './core/slot-manager.js';
+import { processMessageForAutoSave } from './core/auto-save.js';
 // Импорты из load-popup.js больше не нужны для index.js, так как popup теперь управляется через callGenericPopup
-import { KVCacheManagerInterceptor, setSlotForGeneration } from './generation-interceptor.js';
+import { KVCacheManagerInterceptor, setSlotForGeneration } from './interceptors/generation-interceptor.js';
 
 // Функция вызывается при загрузке расширения
 jQuery(async () => {

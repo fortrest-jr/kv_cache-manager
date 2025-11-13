@@ -1,12 +1,13 @@
 // Перехватчик генерации для KV Cache Manager
 
 import { getContext } from "../../../extensions.js";
-import { normalizeCharacterName, formatTimestampToDate } from './utils.js';
-import { getSlotsState, acquireSlot } from './slot-manager.js';
-import { loadSlotCache } from './cache-operations.js';
-import { getLastCacheForCharacter } from './load-popup.js';
-import { parseSaveFilename } from './file-manager.js';
-import { showToast } from './ui.js';
+import { formatTimestampToDate } from '../utils/utils.js';
+import { getSlotsState, acquireSlot } from '../core/slot-manager.js';
+import { loadSlotCache } from '../core/cache-operations.js';
+import { getLastCacheForCharacter, parseSaveFilename } from '../core/file-manager.js';
+import { showToast } from '../ui/ui.js';
+import { getNormalizedCharacterNameFromContext, getNormalizedCharacterNameFromData } from '../utils/character-utils.js';
+import { MIN_USAGE_FOR_SAVE } from '../settings.js';
 
 // Текущий слот для генерации
 let currentSlot = null;
@@ -41,44 +42,6 @@ export function getCurrentSlot() {
     return currentSlot;
 }
 
-// Получение нормализованного имени персонажа из контекста генерации
-// @returns {string|null} - нормализованное имя персонажа или null
-export function getNormalizedCharacterNameFromContext() {
-    try {
-        const context = getContext();
-        
-        if (!context || !context.characterId) {
-            return null;
-        }
-        
-        const character = context.characters[context.characterId];
-        if (!character || !character.name) {
-            return null;
-        }
-        
-        return normalizeCharacterName(character.name);
-    } catch (e) {
-        console.error('[KV Cache Manager] Ошибка при получении имени персонажа из контекста:', e);
-        return null;
-    }
-}
-
-// Получение нормализованного имени персонажа из данных события
-// @param {any} data - данные события
-// @returns {string|null} - нормализованное имя персонажа или null
-export function getNormalizedCharacterNameFromData(data) {
-    if (!data) {
-        return null;
-    }
-    
-    const characterName = data?.char || data?.name || null;
-    if (!characterName || typeof characterName !== 'string') {
-        return null;
-    }
-    
-    return normalizeCharacterName(characterName);
-}
-
 // Функция-перехватчик генерации для загрузки кеша персонажа в слоты
 /**
  * Перехватчик генерации для загрузки кеша персонажа в слоты
@@ -88,8 +51,6 @@ export function getNormalizedCharacterNameFromData(data) {
  * @param {string} type - Тип генерации ('normal', 'regenerate', 'swipe', 'quiet', 'impersonate', 'continue')
  */
 export async function KVCacheManagerInterceptor(chat, contextSize, abort, type) {
-    const MIN_USAGE_FOR_SAVE = 2;
-    
     // Пропускаем impersonate
     if (type === 'impersonate') {
         return;

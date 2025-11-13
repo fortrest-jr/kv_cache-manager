@@ -3,14 +3,7 @@
 
 import { textgen_types, textgenerationwebui_settings } from '../../../textgen-settings.js';
 import HttpClient from './http-client.js';
-
-// Таймауты по умолчанию (в миллисекундах)
-const DEFAULT_TIMEOUTS = {
-    GET_SLOTS: 10000,           // 10 секунд
-    SAVE_CACHE: 300000,          // 5 минут
-    LOAD_CACHE: 300000,          // 5 минут
-    CLEAR_CACHE: 30000           // 30 секунд
-};
+import { LLAMA_API_TIMEOUTS } from '../settings.js';
 
 /**
  * API клиент для работы с llama.cpp сервером
@@ -62,7 +55,7 @@ class LlamaApi {
     async getSlots(options = {}) {
         const url = this._buildUrl('slots');
         const requestOptions = {
-            timeout: DEFAULT_TIMEOUTS.GET_SLOTS,
+            timeout: LLAMA_API_TIMEOUTS.GET_SLOTS,
             ...options
         };
         
@@ -82,7 +75,7 @@ class LlamaApi {
     async saveSlotCache(slotId, filename, options = {}) {
         const url = this._buildUrl(`slots/${slotId}?action=save`);
         const requestOptions = {
-            timeout: DEFAULT_TIMEOUTS.SAVE_CACHE,
+            timeout: LLAMA_API_TIMEOUTS.SAVE_CACHE,
             ...options
         };
         
@@ -102,7 +95,7 @@ class LlamaApi {
     async loadSlotCache(slotId, filename, options = {}) {
         const url = this._buildUrl(`slots/${slotId}?action=restore`);
         const requestOptions = {
-            timeout: DEFAULT_TIMEOUTS.LOAD_CACHE,
+            timeout: LLAMA_API_TIMEOUTS.LOAD_CACHE,
             ...options
         };
         
@@ -121,7 +114,7 @@ class LlamaApi {
     async clearSlotCache(slotId, options = {}) {
         const url = this._buildUrl(`slots/${slotId}?action=erase`);
         const requestOptions = {
-            timeout: DEFAULT_TIMEOUTS.CLEAR_CACHE,
+            timeout: LLAMA_API_TIMEOUTS.CLEAR_CACHE,
             ...options
         };
         

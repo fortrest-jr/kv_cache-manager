@@ -2,13 +2,7 @@
 // Содержит только описания эндпоинтов и базовую обработку ошибок
 
 import HttpClient from './http-client.js';
-
-// Таймауты по умолчанию (в миллисекундах)
-const DEFAULT_TIMEOUTS = {
-    CSRF_TOKEN: 5000,            // 5 секунд
-    GET_FILES: 10000,            // 10 секунд
-    DELETE_FILE: 10000           // 10 секунд
-};
+import { FILE_PLUGIN_API_TIMEOUTS } from '../settings.js';
 
 /**
  * API клиент для работы с плагином kv-cache-manager
@@ -43,7 +37,7 @@ class FilePluginApi {
         try {
             const url = '/csrf-token';
             const requestOptions = {
-                timeout: DEFAULT_TIMEOUTS.CSRF_TOKEN,
+                timeout: FILE_PLUGIN_API_TIMEOUTS.CSRF_TOKEN,
                 ...options
             };
             
@@ -71,7 +65,7 @@ class FilePluginApi {
     async getFilesList(options = {}) {
         const url = '/api/plugins/kv-cache-manager/files';
         const requestOptions = {
-            timeout: DEFAULT_TIMEOUTS.GET_FILES,
+            timeout: FILE_PLUGIN_API_TIMEOUTS.GET_FILES,
             ...options
         };
         
@@ -90,7 +84,7 @@ class FilePluginApi {
     async deleteFile(filename, options = {}) {
         const url = `/api/plugins/kv-cache-manager/files/${filename}`;
         const requestOptions = {
-            timeout: DEFAULT_TIMEOUTS.DELETE_FILE,
+            timeout: FILE_PLUGIN_API_TIMEOUTS.DELETE_FILE,
             ...options
         };
         

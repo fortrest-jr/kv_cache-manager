@@ -2,11 +2,11 @@
 
 import { getContext } from "../../../extensions.js";
 import { generateQuietPrompt } from "../../../../script.js";
-import { saveCharacterCache } from './cache-operations.js';
+import { saveCharacterCache } from '../core/cache-operations.js';
 import { showToast, disableAllSaveButtons, enableAllSaveButtons } from './ui.js';
-import { setPreloadingMode, setCurrentPreloadCharacter, getCurrentSlot } from './generation-interceptor.js';
+import { setPreloadingMode, setCurrentPreloadCharacter, getCurrentSlot } from '../interceptors/generation-interceptor.js';
 import { createHiddenMessage, editMessageUsingUpdate } from './hidden-message.js';
-import { getExtensionSettings } from './settings.js';
+import { getExtensionSettings } from '../settings.js';
 
 // Обновление обработчика кнопки отмены
 function updateCancelButtonHandler(messageId, handleCancel) {

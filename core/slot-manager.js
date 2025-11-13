@@ -2,11 +2,11 @@
 
 import { getContext } from "../../../extensions.js";
 import { getGroupMembers, selected_group, groups } from '../../../group-chats.js';
-import LlamaApi from './llama-api.js';
-import { normalizeCharacterName, getNormalizedChatId } from './utils.js';
-import { showToast } from './ui.js';
+import LlamaApi from '../api/llama-api.js';
+import { normalizeCharacterName, getNormalizedChatId } from '../utils/utils.js';
+import { showToast } from '../ui/ui.js';
 import { saveCharacterCache, saveAllSlotsCache, clearAllSlotsCache } from './cache-operations.js';
-import { getExtensionSettings } from './settings.js';
+import { getExtensionSettings } from '../settings.js';
 
 // Инициализация API клиента
 const llamaApi = new LlamaApi();

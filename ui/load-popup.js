@@ -1,12 +1,12 @@
 // Popup загрузки для KV Cache Manager
 
-import { getNormalizedChatId, normalizeCharacterName, formatTimestampToDate, parseFilesList, sortByTimestamp } from './utils.js';
+import { getNormalizedChatId, formatTimestampToDate } from '../utils/utils.js';
 import { getCurrentChatId } from "../../../../script.js";
-import { getFilesList, parseSaveFilename } from './file-manager.js';
-import { getSlotsState, acquireSlot, updateSlotsList } from './slot-manager.js';
-import { loadSlotCache, saveCharacterCache } from './cache-operations.js';
+import { getFilesList, parseSaveFilename, groupFilesByChatAndCharacter, getLastCacheForCharacter } from '../core/file-manager.js';
+import { getSlotsState, acquireSlot, updateSlotsList } from '../core/slot-manager.js';
+import { loadSlotCache, saveCharacterCache } from '../core/cache-operations.js';
 import { showToast } from './ui.js';
-import { getExtensionSettings, extensionFolderPath } from './settings.js';
+import { getExtensionSettings, extensionFolderPath, MIN_USAGE_FOR_SAVE } from '../settings.js';
 import { callGenericPopup, POPUP_TYPE, POPUP_RESULT } from '../../../../scripts/popup.js';
 
 // Используем стандартный POPUP_RESULT.AFFIRMATIVE для кнопки "Загрузить"
@@ -21,47 +21,6 @@ let loadPopupData = {
     searchQuery: '',
     currentPopup: null // Ссылка на текущий открытый popup
 };
-
-// Группировка файлов по чатам и персонажам
-// Возвращает: { [chatId]: { [characterName]: [{ timestamp, filename, tag }, ...] } }
-export function groupFilesByChatAndCharacter(files) {
-    const chats = {};
-    
-    // Парсим файлы один раз
-    const parsedFiles = parseFilesList(files, parseSaveFilename);
-    
-    for (const file of parsedFiles) {
-        if (!file.parsed) {
-            continue;
-        }
-        
-        const chatId = file.parsed.chatId;
-        const characterName = file.parsed.characterName || 'Unknown';
-        
-        if (!chats[chatId]) {
-            chats[chatId] = {};
-        }
-        
-        if (!chats[chatId][characterName]) {
-            chats[chatId][characterName] = [];
-        }
-        
-        chats[chatId][characterName].push({
-            timestamp: file.parsed.timestamp,
-            filename: file.name,
-            tag: file.parsed.tag || null
-        });
-    }
-    
-    // Сортируем timestamp для каждого персонажа (от новых к старым)
-    for (const chatId in chats) {
-        for (const characterName in chats[chatId]) {
-            sortByTimestamp(chats[chatId][characterName]);
-        }
-    }
-    
-    return chats;
-}
 
 // Настройка обработчиков событий для popup
 function setupLoadPopupHandlers() {
@@ -465,86 +424,6 @@ export function updateLoadPopupSelection(context = document) {
     }
 }
 
-// Получение последнего кеша для персонажа
-// @param {string} characterName - Нормализованное имя персонажа
-// @param {boolean} currentChatOnly - искать только в текущем чате (по умолчанию true)
-export async function getLastCacheForCharacter(characterName, currentChatOnly = true) {
-    try {
-        const filesList = await getFilesList();
-        if (!filesList || filesList.length === 0) {
-            return null;
-        }
-        
-        // characterName уже должен быть нормализован, но нормализуем для безопасности
-        const normalizedCharacterName = normalizeCharacterName(characterName);
-        
-        // Получаем chatId текущего чата для фильтрации (если нужно)
-        const currentChatId = currentChatOnly ? getNormalizedChatId() : null;
-        
-        // Парсим файлы один раз и фильтруем
-        const parsedFiles = parseFilesList(filesList, parseSaveFilename);
-        
-        // Ищем файлы, содержащие имя персонажа
-        const characterFiles = [];
-        
-        for (const file of parsedFiles) {
-            if (!file.parsed) {
-                continue;
-            }
-            
-            // Фильтруем по чату, если нужно
-            if (currentChatOnly && file.parsed.chatId !== currentChatId) {
-                continue;
-            }
-            
-            // Проверяем по characterName в имени файла (основной способ для режима групповых чатов)
-            if (file.parsed.characterName) {
-                const normalizedParsedName = normalizeCharacterName(file.parsed.characterName);
-                if (normalizedParsedName === normalizedCharacterName) {
-                    characterFiles.push({
-                        filename: file.name,
-                        timestamp: file.parsed.timestamp,
-                        chatId: file.parsed.chatId
-                    });
-                    continue; // Найден по characterName, не нужно проверять fallback
-                }
-            }
-            
-            // Также проверяем по имени файла (fallback, менее надежный способ)
-            if (file.name.includes(normalizedCharacterName) || file.name.includes(characterName)) {
-                // Убеждаемся, что это не дубликат
-                const alreadyAdded = characterFiles.some(f => f.filename === file.name);
-                if (!alreadyAdded) {
-                    characterFiles.push({
-                        filename: file.name,
-                        timestamp: file.parsed.timestamp,
-                        chatId: file.parsed.chatId
-                    });
-                }
-            }
-        }
-        
-        if (characterFiles.length === 0) {
-            console.debug(`[KV Cache Manager] Не найдено кеша для персонажа ${characterName}${currentChatOnly ? ` в чате ${currentChatId}` : ''}`);
-            return null;
-        }
-        
-        // Сортируем по timestamp (от новых к старым)
-        sortByTimestamp(characterFiles);
-        
-        // Возвращаем самый последний файл
-        const lastFile = characterFiles[0];
-        console.debug(`[KV Cache Manager] Найден последний кеш для персонажа ${characterName}: ${lastFile.filename}${currentChatOnly ? ` (в текущем чате)` : ' (во всех чатах)'}`);
-        
-        return {
-            filename: lastFile.filename,
-        };
-    } catch (e) {
-        console.error(`[KV Cache Manager] Ошибка при поиске кеша для персонажа ${characterName}:`, e);
-        return null;
-    }
-}
-
 // Загрузка выбранного кеша
 export async function loadSelectedCache() {
     const selectedCharacters = loadPopupData.selectedCharacters;
@@ -575,7 +454,6 @@ export async function loadSelectedCache() {
     showToast('info', `Начинаю загрузку кешей для ${Object.keys(selectedCharacters).length} персонажей...`, 'Загрузка');
     
     const extensionSettings = getExtensionSettings();
-    const MIN_USAGE_FOR_SAVE = 1;
     
     // Шаг 1: Подготавливаем данные о выбранных персонажах и создаем Set защищенных персонажей
     // Имена персонажей уже нормализованы в groupFilesByChatAndCharacter()

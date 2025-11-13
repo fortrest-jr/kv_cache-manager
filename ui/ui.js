@@ -1,9 +1,9 @@
 // UI компоненты и уведомления для KV Cache Manager
 
-import { getExtensionSettings } from './settings.js';
-import { getNormalizedChatId } from './utils.js';
-import { getSlotsState, initializeSlots } from './slot-manager.js';
-import { saveCache, saveCharacterCache } from './cache-operations.js';
+import { getExtensionSettings } from '../settings.js';
+import { getNormalizedChatId } from '../utils/utils.js';
+import { getSlotsState, initializeSlots } from '../core/slot-manager.js';
+import { saveCache, saveCharacterCache } from '../core/cache-operations.js';
 import { preloadCharactersCache } from './preload-cache.js';
 import { openLoadPopup } from './load-popup.js';
 import { openPreloadPopup } from './preload-popup.js';
@@ -70,7 +70,7 @@ export async function onSaveNowButtonClick() {
         const success = await saveCache(false);
         if (success) {
             // Обновляем отображение слотов после сохранения
-            const { updateSlotsList } = await import('./slot-manager.js');
+            const { updateSlotsList } = await import('../core/slot-manager.js');
             updateSlotsList();
         }
     } finally {

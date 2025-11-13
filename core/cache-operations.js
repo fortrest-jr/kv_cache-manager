@@ -1,19 +1,15 @@
 // Операции с кешем для KV Cache Manager
 
-import LlamaApi from './llama-api.js';
-import { formatTimestamp, getNormalizedChatId } from './utils.js';
-import { generateSaveFilename, getFilesList, deleteFile, rotateCharacterFiles } from './file-manager.js';
+import LlamaApi from '../api/llama-api.js';
+import { formatTimestamp, getNormalizedChatId } from '../utils/utils.js';
+import { generateSaveFilename, rotateCharacterFiles, validateCacheFile } from './file-manager.js';
 import { getAllSlotsInfo, getSlotsState, resetSlotUsage, setSlotCacheLoaded, getSlotsCountFromData, updateSlotsList } from './slot-manager.js';
-import { showToast, disableAllSaveButtons, enableAllSaveButtons } from './ui.js';
-import { getExtensionSettings } from './settings.js';
+import { showToast, disableAllSaveButtons, enableAllSaveButtons } from '../ui/ui.js';
+import { getExtensionSettings, MIN_USAGE_FOR_SAVE } from '../settings.js';
 import { getContext } from "../../../extensions.js";
 
 // Инициализация API клиента
 const llamaApi = new LlamaApi();
-
-// Константы
-const MIN_FILE_SIZE_MB = 1; // Минимальный размер файла кеша в МБ (файлы меньше этого размера считаются невалидными)
-const FILE_CHECK_DELAY_MS = 500; // Задержка перед проверкой размера файла после сохранения (мс)
 
 // Сохранение кеша для слота
 // @param {number} slotId - Индекс слота
@@ -28,27 +24,9 @@ export async function saveSlotCache(slotId, filename, characterName) {
         console.debug(`[KV Cache Manager] Кеш успешно сохранен для слота ${slotId}`);
         
         // Проверяем размер сохраненного файла
-        try {
-            // Ждем немного, чтобы файл точно был сохранен на сервере
-            await new Promise(resolve => setTimeout(resolve, FILE_CHECK_DELAY_MS));
-            
-            const filesList = await getFilesList();
-            const savedFile = filesList.find(file => file.name === filename);
-            
-            if (savedFile) {
-                const fileSizeMB = savedFile.size / (1024 * 1024); // Размер в мегабайтах
-                
-                if (fileSizeMB < MIN_FILE_SIZE_MB) {
-                    // Файл меньше минимального размера - считаем невалидным и удаляем
-                    console.warn(`[KV Cache Manager] Файл ${filename} слишком мал (${fileSizeMB.toFixed(2)} МБ), удаляем как невалидный`);
-                    await deleteFile(filename);
-                    showToast('warning', `Файл кеша для ${characterName} слишком мал, не сохранён`);
-                    return false;
-                }
-            }
-        } catch (e) {
-            console.warn(`[KV Cache Manager] Не удалось проверить размер файла ${filename}:`, e);
-            // Продолжаем, даже если не удалось проверить размер
+        const isValid = await validateCacheFile(filename, characterName);
+        if (!isValid) {
+            return false;
         }
         
         showToast('success', `Кеш для ${characterName} успешно сохранен`);
@@ -215,7 +193,6 @@ export async function saveCharacterCache(characterName, slotIndex) {
 // Сохранение кеша для всех персонажей, которые находятся в слотах
 // Используется перед очисткой слотов при смене чата
 export async function saveAllSlotsCache() {
-    const MIN_USAGE_FOR_SAVE = 2;
     const slotsState = getSlotsState();
     const totalSlots = slotsState.length;
     

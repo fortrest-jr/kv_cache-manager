@@ -2,8 +2,8 @@
 
 import { getSlotsState, findCharacterSlotIndex, incrementSlotUsage } from './slot-manager.js';
 import { saveCharacterCache } from './cache-operations.js';
-import { getExtensionSettings } from './settings.js';
-import { getNormalizedCharacterNameFromData } from './generation-interceptor.js';
+import { getExtensionSettings } from '../settings.js';
+import { getNormalizedCharacterNameFromData } from '../utils/character-utils.js';
 
 // Проверка необходимости автосохранения и выполнение сохранения
 // @param {number} slotIndex - Индекс слота

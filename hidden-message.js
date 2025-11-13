@@ -8,7 +8,7 @@ import { eventSource, event_types, chat, saveChatConditional, addOneMessage, upd
 // @param {string} text - Текст сообщения
 // @param {string} name - Имя отправителя (по умолчанию 'System')
 // @returns {Promise<number>} - ID созданного сообщения
-export async function createHiddenMessage(text, name = 'System') {
+export async function createHiddenMessage(text, isSmallSys = true, name = 'KV Cache Manager') {
     console.debug('[KV Cache Manager] createHiddenMessage: начало создания сообщения', { name, textLength: text.length });
     
     const context = getContext();
@@ -25,7 +25,7 @@ export async function createHiddenMessage(text, name = 'System') {
             gen_id: Date.now(),
             // api: 'manual',
             // model: 'hidden message',
-            // isSmallSys: true,
+            isSmallSys: isSmallSys,
         },
     };
     

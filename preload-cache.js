@@ -8,8 +8,22 @@ import { showToast, disableAllSaveButtons, enableAllSaveButtons } from './ui.js'
 import { setPreloadingMode } from './generation-interceptor.js';
 import { createHiddenMessage, editMessageUsingUpdate } from './hidden-message.js';
 
+// Обновление обработчика кнопки отмены
+function updateCancelButtonHandler(messageId, handleCancel) {
+    setTimeout(() => {
+        const cancelButton = $(`#kv-cache-preload-cancel-btn-${messageId}`);
+        if (cancelButton.length > 0) {
+            cancelButton.off('click').on('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                handleCancel();
+            });
+        }
+    }, 100);
+}
+
 // Формирование текста статуса предзагрузки
-function formatPreloadStatus(current, total, preloaded, errors, currentCharacterName = null, currentSlotIndex = null) {
+function formatPreloadStatus(current, total, preloaded, errors, currentCharacterName = null, currentSlotIndex = null, isCancelled = false, messageId = null) {
     const remaining = total - current;
     const progress = total > 0 ? Math.round((current / total) * 100) : 0;
     
@@ -17,12 +31,16 @@ function formatPreloadStatus(current, total, preloaded, errors, currentCharacter
     let status = `<div style="text-align: left;">\n`;
     status += `**Предзагрузка кеша**\n\n`;
     
-    // Добавляем имя текущего прогреваемого персонажа и слот, если указано
-    if (currentCharacterName) {
-        if (currentSlotIndex !== null && currentSlotIndex !== undefined) {
-            status += `Прогревается: **${currentCharacterName}** (слот ${currentSlotIndex})\n\n`;
-        } else {
-            status += `Прогревается: **${currentCharacterName}**\n\n`;
+    if (isCancelled) {
+        status += `⚠️ **Отменено**\n\n`;
+    } else {
+        // Добавляем имя текущего прогреваемого персонажа и слот, если указано
+        if (currentCharacterName) {
+            if (currentSlotIndex !== null && currentSlotIndex !== undefined) {
+                status += `Прогревается: **${currentCharacterName}** (слот ${currentSlotIndex})\n\n`;
+            } else {
+                status += `Прогревается: **${currentCharacterName}**\n\n`;
+            }
         }
     }
     
@@ -42,6 +60,11 @@ function formatPreloadStatus(current, total, preloaded, errors, currentCharacter
         errors.forEach((error, idx) => {
             status += `${idx + 1}. ${error}\n`;
         });
+    }
+    
+    // Добавляем кнопку отмены, если процесс не завершен и не отменен
+    if (!isCancelled && current < total && messageId !== null) {
+        status += `\n\n<button id="kv-cache-preload-cancel-btn-${messageId}" class="menu_button" style="margin-top: 10px;">Отменить</button>`;
     }
     
     status += `</div>`;
@@ -74,6 +97,26 @@ export async function preloadCharactersCache(characters) {
     let statusMessageId = null;
     const preloaded = [];
     const errors = [];
+    let isCancelled = false;
+    
+    // Функция для обработки отмены
+    const handleCancel = () => {
+        isCancelled = true;
+        console.debug('[KV Cache Manager] Предзагрузка отменена пользователем');
+        if (statusMessageId !== null) {
+            const status = formatPreloadStatus(
+                preloaded.length, 
+                characters.length, 
+                preloaded, 
+                [...errors, 'Отменено пользователем'], 
+                null, 
+                null, 
+                true, 
+                statusMessageId
+            );
+            editMessageUsingUpdate(statusMessageId, status);
+        }
+    };
     
     try {
         console.debug('[KV Cache Manager] Начало предзагрузки:', {
@@ -82,13 +125,32 @@ export async function preloadCharactersCache(characters) {
         });
         
         // Создаем начальное сообщение
-        const initialStatus = formatPreloadStatus(0, characters.length, [], []);
+        const initialStatus = formatPreloadStatus(0, characters.length, [], [], null, null, false, null);
         console.debug('[KV Cache Manager] Создание начального сообщения статуса...');
-        statusMessageId = await createHiddenMessage(initialStatus, 'KV Cache Manager');
+        statusMessageId = await createHiddenMessage(initialStatus, true);
         console.debug('[KV Cache Manager] Сообщение статуса создано, ID:', statusMessageId);
+        
+        // Устанавливаем обработчик для кнопки отмены после небольшой задержки (чтобы DOM успел обновиться)
+        setTimeout(() => {
+            const cancelButton = $(`#kv-cache-preload-cancel-btn-${statusMessageId}`);
+            if (cancelButton.length > 0) {
+                cancelButton.off('click').on('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleCancel();
+                });
+                console.debug('[KV Cache Manager] Обработчик кнопки отмены установлен');
+            }
+        }, 500);
         
         // Обрабатываем каждого персонажа последовательно
         for (let i = 0; i < characters.length; i++) {
+            // Проверяем флаг отмены
+            if (isCancelled) {
+                console.debug('[KV Cache Manager] Предзагрузка отменена, прерываем цикл');
+                break;
+            }
+            
             const character = characters[i];
             const characterName = character.name;
             const normalizedName = character.normalizedName;
@@ -98,8 +160,10 @@ export async function preloadCharactersCache(characters) {
                 errors.push(`${characterName}: не найден ID персонажа`);
                 // Обновляем статус
                 if (statusMessageId !== null) {
-                    const status = formatPreloadStatus(i + 1, characters.length, preloaded, errors, characterName, null);
+                    const status = formatPreloadStatus(i + 1, characters.length, preloaded, errors, characterName, null, isCancelled, statusMessageId);
                     await editMessageUsingUpdate(statusMessageId, status);
+                    // Обновляем обработчик кнопки отмены
+                    updateCancelButtonHandler(statusMessageId, handleCancel);
                 }
                 continue;
             }
@@ -120,11 +184,19 @@ export async function preloadCharactersCache(characters) {
                 
                 console.debug(`[KV Cache Manager] Предзагрузка для персонажа ${characterName} в слот ${slotIndex}`);
                 
+                // Проверяем флаг отмены перед началом обработки
+                if (isCancelled) {
+                    console.debug('[KV Cache Manager] Предзагрузка отменена перед обработкой персонажа');
+                    break;
+                }
+                
                 // Обновляем статус после получения слота (перед началом обработки персонажа)
                 if (statusMessageId !== null) {
-                    const status = formatPreloadStatus(i, characters.length, preloaded, errors, characterName, slotIndex);
+                    const status = formatPreloadStatus(i, characters.length, preloaded, errors, characterName, slotIndex, isCancelled, statusMessageId);
                     console.debug(`[KV Cache Manager] Обновление статуса перед персонажем ${i + 1}/${characters.length}:`, { characterName, slotIndex, statusMessageId });
                     await editMessageUsingUpdate(statusMessageId, status);
+                    // Обновляем обработчик кнопки отмены
+                    updateCancelButtonHandler(statusMessageId, handleCancel);
                     console.debug(`[KV Cache Manager] Статус обновлен для персонажа ${characterName}`);
                 }
                 
@@ -181,6 +253,12 @@ export async function preloadCharactersCache(characters) {
                 });
                 
                 try {
+                    // Проверяем флаг отмены перед запуском генерации
+                    if (isCancelled) {
+                        console.debug('[KV Cache Manager] Предзагрузка отменена перед запуском генерации');
+                        break;
+                    }
+                    
                     // Запускаем генерацию через generateQuietPrompt
                     // generateQuietPrompt возвращает промис
                     const generationTask = generateQuietPrompt({
@@ -191,7 +269,49 @@ export async function preloadCharactersCache(characters) {
                     });
                     
                     // Ждем события GENERATION_AFTER_COMMANDS (это произойдет раньше, чем завершится генерация)
-                    await generationPromise;
+                    // Проверяем флаг отмены во время ожидания
+                    let cancelCheckInterval = null;
+                    const cancelCheckPromise = new Promise((resolve) => {
+                        cancelCheckInterval = setInterval(() => {
+                            if (isCancelled) {
+                                clearInterval(cancelCheckInterval);
+                                // Отписываемся от события при отмене
+                                if (abortHandler) {
+                                    eventSource.removeListener(event_types.GENERATION_AFTER_COMMANDS, abortHandler);
+                                }
+                                // Пытаемся остановить генерацию
+                                if (generationTask && typeof generationTask.cancel === 'function') {
+                                    generationTask.cancel();
+                                }
+                                if (typeof getAbortController === 'function') {
+                                    const controller = getAbortController();
+                                    if (controller) {
+                                        controller.abort();
+                                    }
+                                } else if (typeof abortGeneration === 'function') {
+                                    abortGeneration();
+                                }
+                                resolve('cancelled');
+                            }
+                        }, 100);
+                    });
+                    
+                    const result = await Promise.race([
+                        generationPromise.then(() => {
+                            // Очищаем интервал при нормальном завершении
+                            if (cancelCheckInterval) {
+                                clearInterval(cancelCheckInterval);
+                            }
+                            return 'completed';
+                        }),
+                        cancelCheckPromise
+                    ]);
+                    
+                    // Проверяем флаг отмены после генерации
+                    if (isCancelled || result === 'cancelled') {
+                        console.debug('[KV Cache Manager] Предзагрузка отменена после генерации');
+                        break;
+                    }
                     
                     // Останавливаем промис генерации, если это возможно
                     if (generationTask && typeof generationTask.cancel === 'function') {
@@ -225,6 +345,12 @@ export async function preloadCharactersCache(characters) {
                     errors.push(`${characterName}: ошибка сохранения кеша`);
                 }
                 
+                // Проверяем флаг отмены после обработки
+                if (isCancelled) {
+                    console.debug('[KV Cache Manager] Предзагрузка отменена после обработки персонажа');
+                    break;
+                }
+                
                 // Обновляем статус после обработки персонажа
                 if (statusMessageId !== null) {
                     // Показываем имя следующего персонажа и его слот, если он есть
@@ -234,9 +360,11 @@ export async function preloadCharactersCache(characters) {
                         nextCharacterName = characters[i + 1].name;
                         // Слот для следующего персонажа еще не получен, поэтому null
                     }
-                    const status = formatPreloadStatus(i + 1, characters.length, preloaded, errors, nextCharacterName, nextSlotIndex);
+                    const status = formatPreloadStatus(i + 1, characters.length, preloaded, errors, nextCharacterName, nextSlotIndex, isCancelled, statusMessageId);
                     console.debug(`[KV Cache Manager] Обновление статуса после персонажа ${i + 1}/${characters.length}:`, { characterName, statusMessageId, saved });
                     await editMessageUsingUpdate(statusMessageId, status);
+                    // Обновляем обработчик кнопки отмены
+                    updateCancelButtonHandler(statusMessageId, handleCancel);
                     console.debug(`[KV Cache Manager] Статус обновлен после обработки ${characterName}`);
                 }
                 
@@ -248,9 +376,11 @@ export async function preloadCharactersCache(characters) {
                 if (statusMessageId !== null) {
                     // Показываем имя следующего персонажа, если он есть
                     const nextCharacterName = i + 1 < characters.length ? characters[i + 1].name : null;
-                    const status = formatPreloadStatus(i + 1, characters.length, preloaded, errors, nextCharacterName, null);
+                    const status = formatPreloadStatus(i + 1, characters.length, preloaded, errors, nextCharacterName, null, isCancelled, statusMessageId);
                     console.debug(`[KV Cache Manager] Обновление статуса при ошибке для персонажа ${i + 1}/${characters.length}:`, { characterName, statusMessageId, error: e.message });
                     await editMessageUsingUpdate(statusMessageId, status);
+                    // Обновляем обработчик кнопки отмены
+                    updateCancelButtonHandler(statusMessageId, handleCancel);
                     console.debug(`[KV Cache Manager] Статус обновлен после ошибки для ${characterName}`);
                 }
             }
@@ -258,8 +388,17 @@ export async function preloadCharactersCache(characters) {
         
         // Финальное обновление статуса
         if (statusMessageId !== null) {
-            const finalStatus = formatPreloadStatus(characters.length, characters.length, preloaded, errors);
-            console.debug('[KV Cache Manager] Финальное обновление статуса:', { statusMessageId, preloadedCount: preloaded.length, errorsCount: errors.length });
+            const finalStatus = formatPreloadStatus(
+                isCancelled ? preloaded.length : characters.length, 
+                characters.length, 
+                preloaded, 
+                errors, 
+                null, 
+                null, 
+                isCancelled, 
+                statusMessageId
+            );
+            console.debug('[KV Cache Manager] Финальное обновление статуса:', { statusMessageId, preloadedCount: preloaded.length, errorsCount: errors.length, isCancelled });
             await editMessageUsingUpdate(statusMessageId, finalStatus);
             console.debug('[KV Cache Manager] Финальный статус обновлен');
         } else {

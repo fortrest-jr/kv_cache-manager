@@ -227,9 +227,7 @@ export async function preloadCharactersCache(characters) {
                     
                     // Запускаем генерацию через generateQuietPrompt
                     console.debug(`[KV Cache Manager] [${characterName}] Запуск generateQuietPrompt:`, {
-                        quietPrompt: '',
                         forceChId: characterId,
-                        quietToLoud: false,
                         responseLength: 1
                     });
                     

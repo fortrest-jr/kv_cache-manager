@@ -6,7 +6,7 @@
   "generate_interceptor": "KVCacheManagerInterceptor",
   "js": "index.js",
   "css": "style.css",
-  "version": "4.1.4",
+  "version": "5.1.0",
   "author": "fortrest-jr",
   "auto_update": true,
   "homePage": "https://github.com/fortrest-jr/kv_cache-manager"

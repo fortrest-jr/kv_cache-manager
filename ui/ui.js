@@ -1,17 +1,20 @@
 // UI компоненты и уведомления для KV Cache Manager
 
-import { getExtensionSettings } from './settings.js';
-import { getNormalizedChatId } from './utils.js';
-import { getSlotsState, initializeSlots } from './slot-manager.js';
-import { saveCache, saveCharacterCache } from './cache-operations.js';
+import { getContext } from "../../../../extensions.js";
+import { callGenericPopup, POPUP_TYPE, POPUP_RESULT } from '../../../../../scripts/popup.js';
+
+import { getExtensionSettings } from '../settings.js';
+import { getSlotsState, initializeSlots } from '../core/slot-manager.js';
+import { saveCache, saveCharacterCache } from '../core/cache-operations.js';
+import { preloadCharactersCache } from './preload-cache.js';
 import { openLoadPopup } from './load-popup.js';
+import { openPreloadPopup } from './preload-popup.js';
 
 // Показ toast-уведомления
 export function showToast(type, message, title = 'KV Cache Manager') {
     const extensionSettings = getExtensionSettings();
     
     if (typeof toastr === 'undefined') {
-        console.debug(`[KV Cache Manager] ${title}: ${message}`);
         return;
     }
 
@@ -66,7 +69,7 @@ export async function onSaveNowButtonClick() {
         const success = await saveCache(false);
         if (success) {
             // Обновляем отображение слотов после сохранения
-            const { updateSlotsList } = await import('./slot-manager.js');
+            const { updateSlotsList } = await import('../core/slot-manager.js');
             updateSlotsList();
         }
     } finally {
@@ -79,8 +82,46 @@ export async function onLoadButtonClick() {
 }
 
 export async function onReleaseAllSlotsButtonClick() {
-    await initializeSlots();
-    showToast('success', 'Все слоты освобождены', 'Режим групповых чатов');
+    // Показываем попап подтверждения
+    const confirmationMessage = '<p style="margin: 10px 0; font-size: 14px;">Вы уверены, что хотите очистить все слоты?</p><p style="margin: 10px 0; font-size: 12px; color: var(--SmartThemeBodyColor, #888);">Все данные в слотах будут удалены.</p>';
+    
+    const result = await callGenericPopup(
+        confirmationMessage,
+        POPUP_TYPE.TEXT,
+        '',
+        {
+            okButton: 'Очистить',
+            cancelButton: true,
+            wide: false
+        }
+    );
+    
+    // Выполняем очистку только если пользователь подтвердил
+    if (result === POPUP_RESULT.AFFIRMATIVE) {
+        await initializeSlots();
+        showToast('success', 'Все слоты освобождены', 'Режим групповых чатов');
+    }
+}
+
+// Обработчик кнопки предзагрузки персонажей
+export async function onPreloadCharactersButtonClick() {
+    // Проверяем, что чат групповой
+    const context = getContext();
+    if (!context || context.groupId === null || context.groupId === undefined) {
+        showToast('error', 'Предзагрузка доступна только для групповых чатов');
+        return;
+    }
+    
+    // Открываем popup для выбора персонажей
+    const selectedCharacters = await openPreloadPopup();
+    
+    if (!selectedCharacters || selectedCharacters.length === 0) {
+        // Пользователь отменил выбор или не выбрал персонажей
+        return;
+    }
+    
+    // Запускаем предзагрузку
+    await preloadCharactersCache(selectedCharacters);
 }
 
 // Сохранение кеша для конкретного слота

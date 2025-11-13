@@ -1,16 +1,10 @@
 // API клиент для llama.cpp сервера
 // Содержит только описания эндпоинтов и базовую обработку ошибок
 
-import { textgen_types, textgenerationwebui_settings } from '../../../textgen-settings.js';
-import HttpClient from './http-client.js';
+import { textgen_types, textgenerationwebui_settings } from '../../../../textgen-settings.js';
 
-// Таймауты по умолчанию (в миллисекундах)
-const DEFAULT_TIMEOUTS = {
-    GET_SLOTS: 10000,           // 10 секунд
-    SAVE_CACHE: 300000,          // 5 минут
-    LOAD_CACHE: 300000,          // 5 минут
-    CLEAR_CACHE: 30000           // 30 секунд
-};
+import HttpClient from './http-client.js';
+import { LLAMA_API_TIMEOUTS } from '../settings.js';
 
 /**
  * API клиент для работы с llama.cpp сервером
@@ -26,7 +20,6 @@ class LlamaApi {
      */
     _getBaseUrl() {
         const provided_url = textgenerationwebui_settings.server_urls[textgen_types.LLAMACPP];
-        console.debug('LlamaCpp server URL: ' + provided_url);
         return provided_url;
     }
 
@@ -43,16 +36,6 @@ class LlamaApi {
     }
 
     /**
-     * Базовое логирование запроса
-     * @param {string} method - HTTP метод
-     * @param {string} url - URL запроса
-     * @param {Object} params - Параметры запроса
-     */
-    _logRequest(method, url, params = {}) {
-        console.debug(`[LlamaApi] ${method} ${url}`, params);
-    }
-
-    /**
      * Получение информации о всех слотах
      * @param {Object} options - Опции запроса
      * @param {number} options.timeout - Таймаут в миллисекундах (по умолчанию 10000)
@@ -62,11 +45,10 @@ class LlamaApi {
     async getSlots(options = {}) {
         const url = this._buildUrl('slots');
         const requestOptions = {
-            timeout: DEFAULT_TIMEOUTS.GET_SLOTS,
+            timeout: LLAMA_API_TIMEOUTS.GET_SLOTS,
             ...options
         };
         
-        this._logRequest('GET', url);
         return await this.httpClient.get(url, requestOptions);
     }
 
@@ -82,11 +64,10 @@ class LlamaApi {
     async saveSlotCache(slotId, filename, options = {}) {
         const url = this._buildUrl(`slots/${slotId}?action=save`);
         const requestOptions = {
-            timeout: DEFAULT_TIMEOUTS.SAVE_CACHE,
+            timeout: LLAMA_API_TIMEOUTS.SAVE_CACHE,
             ...options
         };
         
-        this._logRequest('POST', url, { slotId, filename });
         return await this.httpClient.post(url, { filename }, requestOptions);
     }
 
@@ -102,11 +83,10 @@ class LlamaApi {
     async loadSlotCache(slotId, filename, options = {}) {
         const url = this._buildUrl(`slots/${slotId}?action=restore`);
         const requestOptions = {
-            timeout: DEFAULT_TIMEOUTS.LOAD_CACHE,
+            timeout: LLAMA_API_TIMEOUTS.LOAD_CACHE,
             ...options
         };
         
-        this._logRequest('POST', url, { slotId, filename });
         return await this.httpClient.post(url, { filename }, requestOptions);
     }
 
@@ -121,11 +101,10 @@ class LlamaApi {
     async clearSlotCache(slotId, options = {}) {
         const url = this._buildUrl(`slots/${slotId}?action=erase`);
         const requestOptions = {
-            timeout: DEFAULT_TIMEOUTS.CLEAR_CACHE,
+            timeout: LLAMA_API_TIMEOUTS.CLEAR_CACHE,
             ...options
         };
         
-        this._logRequest('POST', url, { slotId });
         return await this.httpClient.post(url, null, requestOptions);
     }
 }

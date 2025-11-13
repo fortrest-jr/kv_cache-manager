@@ -48,7 +48,7 @@
 
 .kv-cache-manager-info {
     margin-top: 10px;
-    padding: 10px;
+    padding: 0px;
     border-left: 3px solid var(--SmartThemeBlurTintColor);
 }
 
@@ -59,7 +59,7 @@
 #kv-cache-slots-list ul {
     list-style-type: disc;
     margin: 5px 0;
-    padding-left: 20px;
+    padding-left: 0px;
 }
 
 #kv-cache-slots-list li {
@@ -71,6 +71,9 @@
 .kv-cache-save-slot-button {
     transition: all 0.2s ease;
     opacity: 0.7;
+    border: 1px solid var(--SmartThemeBorderColor, #ccc) !important;
+    border-radius: 4px;
+    margin-left: 0 !important;
 }
 
 .kv-cache-save-slot-button:hover:not(:disabled) {
@@ -404,5 +407,90 @@
         flex-wrap: wrap;
         gap: 8px;
     }
+}
+
+/* Стили для popup предзагрузки - минимальные, используются стандартные стили Tavern */
+#kv-cache-preload-popup-content {
+    display: flex;
+    flex-direction: column;
+    min-height: 400px;
+}
+
+.kv-cache-preload-search {
+    margin-bottom: 15px;
+}
+
+.kv-cache-preload-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.kv-cache-preload-controls {
+    margin-bottom: 10px;
+    display: flex;
+    gap: 10px;
+}
+
+#kv-cache-preload-characters-list {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.kv-cache-preload-character-item {
+    margin-bottom: 5px;
+}
+
+.kv-cache-preload-character-item label {
+    margin: 0;
+    width: 100%;
+}
+
+#kv-cache-preload-selected-info {
+    margin-top: 15px;
+}
+
+/* Стили для кнопки отмены в сообщении с прогрессом */
+/* Применяем стили menu_button к кнопке в сообщении */
+/* Используем универсальный селектор для всех кнопок с этим ID */
+#chat [id^="kv-cache-preload-cancel-btn-"],
+.chat [id^="kv-cache-preload-cancel-btn-"],
+.message [id^="kv-cache-preload-cancel-btn-"],
+button[id^="kv-cache-preload-cancel-btn-"] {
+    display: inline-block !important;
+    padding: 8px 16px !important;
+    margin-top: 10px !important;
+    cursor: pointer !important;
+    border: 1px solid var(--SmartThemeBorderColor, #ccc) !important;
+    border-radius: 4px !important;
+    background: var(--SmartThemeBlurTintColor, #4a9eff) !important;
+    color: var(--SmartThemeBodyColor, #fff) !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    transition: all 0.2s !important;
+    font-family: inherit !important;
+    text-align: center !important;
+    text-decoration: none !important;
+    box-sizing: border-box !important;
+    min-width: auto !important;
+    width: auto !important;
+}
+
+#chat [id^="kv-cache-preload-cancel-btn-"]:hover,
+.chat [id^="kv-cache-preload-cancel-btn-"]:hover,
+.message [id^="kv-cache-preload-cancel-btn-"]:hover,
+button[id^="kv-cache-preload-cancel-btn-"]:hover {
+    opacity: 0.9 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+}
+
+#chat [id^="kv-cache-preload-cancel-btn-"]:active,
+.chat [id^="kv-cache-preload-cancel-btn-"]:active,
+.message [id^="kv-cache-preload-cancel-btn-"]:active,
+button[id^="kv-cache-preload-cancel-btn-"]:active {
+    transform: translateY(0) !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2) !important;
 }
 

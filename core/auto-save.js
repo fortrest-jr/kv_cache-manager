@@ -2,8 +2,8 @@
 
 import { getSlotsState, findCharacterSlotIndex, incrementSlotUsage } from './slot-manager.js';
 import { saveCharacterCache } from './cache-operations.js';
-import { getExtensionSettings } from './settings.js';
-import { getNormalizedCharacterNameFromData } from './generation-interceptor.js';
+import { getExtensionSettings } from '../settings.js';
+import { getNormalizedCharacterNameFromData } from '../utils/character-utils.js';
 
 // Проверка необходимости автосохранения и выполнение сохранения
 // @param {number} slotIndex - Индекс слота
@@ -73,16 +73,12 @@ export async function processMessageForAutoSave(data) {
         incrementSlotUsage(slotIndex);
         const newUsage = slot.usage;
         
-        console.debug(`[KV Cache Manager] Usage для персонажа ${characterName} в слоте ${slotIndex} увеличен до: ${newUsage} (тип: ${generationType})`);
-        
         // Проверяем необходимость автосохранения
         await checkAndPerformAutoSave(slotIndex, newUsage);
         
         // Обновляем отображение
         const { updateSlotsList } = await import('./slot-manager.js');
         updateSlotsList();
-    } else {
-        console.debug(`[KV Cache Manager] Usage для персонажа ${characterName} в слоте ${slotIndex} не увеличен (тип: ${generationType}, текущее значение: ${slot?.usage})`);
     }
     
     // Очищаем тип генерации после обработки

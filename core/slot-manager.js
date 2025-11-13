@@ -1,12 +1,13 @@
 // Управление слотами для KV Cache Manager
 
-import { getContext } from "../../../extensions.js";
-import { getGroupMembers } from '../../../group-chats.js';
-import LlamaApi from './llama-api.js';
-import { normalizeCharacterName, getNormalizedChatId } from './utils.js';
-import { showToast } from './ui.js';
+import { getContext } from "../../../../extensions.js";
+import { getGroupMembers, selected_group, groups } from '../../../../group-chats.js';
+
+import LlamaApi from '../api/llama-api.js';
+import { normalizeCharacterName, getNormalizedChatId } from '../utils/utils.js';
+import { showToast } from '../ui/ui.js';
 import { saveCharacterCache, saveAllSlotsCache, clearAllSlotsCache } from './cache-operations.js';
-import { getExtensionSettings } from './settings.js';
+import { getExtensionSettings } from '../settings.js';
 
 // Инициализация API клиента
 const llamaApi = new LlamaApi();
@@ -38,7 +39,7 @@ export async function getAllSlotsInfo() {
         const slotsData = await llamaApi.getSlots();
         return slotsData;
     } catch (e) {
-        console.debug('[KV Cache Manager] Ошибка получения информации о слотах:', e);
+        console.error('[KV Cache Manager] Ошибка получения информации о слотах:', e);
         const errorMessage = e.message || String(e);
         showToast('error', `Ошибка получения информации о слотах: ${errorMessage}`);
         return null;
@@ -74,8 +75,6 @@ export async function initializeSlots() {
         slotsState[i] = createEmptySlot();
     }
     
-    console.debug(`[KV Cache Manager] Инициализировано ${totalSlots} слотов для режима групповых чатов`);
-    
     // Обновляем UI
     updateSlotsList();
 }
@@ -99,14 +98,13 @@ export function getNormalizedChatCharacters() {
             const characterName = context.name2;
             if (characterName) {
                 const normalizedName = normalizeCharacterName(characterName);
-                console.debug(`[KV Cache Manager] Обычный чат, найден персонаж: ${characterName} (нормализовано: ${normalizedName})`);
                 return [normalizedName];
             }
             return [];
         } else {
             // Групповой чат
             // Используем getGroupMembers() для получения массива объектов персонажей
-            const groupMembers = getGroupMembers(context.groupId);
+            const groupMembers = getGroupMembers();
             
             if (!groupMembers || groupMembers.length === 0) {
                 console.warn('[KV Cache Manager] Не найдено участников группового чата');
@@ -119,7 +117,6 @@ export function getNormalizedChatCharacters() {
                 .filter(name => name && typeof name === 'string')
                 .map(name => normalizeCharacterName(name));
             
-            console.debug(`[KV Cache Manager] Групповой чат, найдено ${normalizedNames.length} персонажей (нормализовано)`);
             return normalizedNames;
         }
     } catch (e) {
@@ -147,20 +144,15 @@ export async function assignCharactersToSlots() {
     }
     
     if (chatCharacters.length === 0) {
-        console.debug('[KV Cache Manager] Не найдено персонажей в текущем чате для распределения по слотам');
         updateSlotsList();
         return;
     }
-    
-    console.debug(`[KV Cache Manager] Распределение ${chatCharacters.length} персонажей по ${totalSlots} слотам`);
     
     // Распределяем персонажей по слотам: идем по индексу, пока не закончатся либо слоты, либо персонажи
     // Имена уже нормализованы из getNormalizedChatCharacters()
     for (let i = 0; i < totalSlots && i < chatCharacters.length; i++) {
         slotsState[i] = createSlotWithCharacter(chatCharacters[i]);
     }
-    
-    console.debug(`[KV Cache Manager] Персонажи распределены по слотам:`, slotsState);
     
     // Обновляем UI
     updateSlotsList();
@@ -193,8 +185,6 @@ export async function acquireSlot(characterName, minUsageForSave = 1, protectedC
     // 1. Проверяем, есть ли персонаж уже в слоте - если да, возвращаем этот слот
     const existingIndex = findCharacterSlotIndex(characterName);
     if (existingIndex !== null) {
-        // Персонаж уже в слоте - возвращаем существующий слот
-        console.debug(`[KV Cache Manager] Персонаж ${characterName} уже в слоте ${existingIndex}, счетчик: ${slotsState[existingIndex].usage || 0}`);
         updateSlotsList();
         return existingIndex;
     }
@@ -205,7 +195,6 @@ export async function acquireSlot(characterName, minUsageForSave = 1, protectedC
         // Найден пустой слот - устанавливаем персонажа туда (храним нормализованное имя)
         // Счетчик использования всегда начинается с 0, управление счетчиком вне этой функции
         slotsState[freeSlotIndex] = createSlotWithCharacter(characterName);
-        console.debug(`[KV Cache Manager] Персонаж ${characterName} установлен в пустой слот ${freeSlotIndex}, счетчик: ${slotsState[freeSlotIndex].usage}`);
         updateSlotsList();
         return freeSlotIndex;
     }
@@ -246,8 +235,6 @@ export async function acquireSlot(characterName, minUsageForSave = 1, protectedC
         // Сохраняем кеш перед вытеснением только если персонаж использовал слот минимум N раз
         if (usageCount >= minUsageForSave) {
             await saveCharacterCache(evictedCharacter, minUsageIndex);
-        } else {
-            console.debug(`[KV Cache Manager] Пропускаем сохранение кеша для ${evictedCharacter} (использование: ${usageCount} < ${minUsageForSave})`);
         }
     }
     
@@ -255,8 +242,6 @@ export async function acquireSlot(characterName, minUsageForSave = 1, protectedC
     // Храним нормализованное имя (characterName уже нормализован)
     // Счетчик использования всегда начинается с 0, управление счетчиком вне этой функции
     slotsState[minUsageIndex] = createSlotWithCharacter(characterName);
-    
-    console.debug(`[KV Cache Manager] Персонаж ${characterName} установлен в слот ${minUsageIndex}${evictedCharacter ? ` (вытеснен ${evictedCharacter}, использование: ${minUsage})` : ' (свободный слот)'}, счетчик: ${slotsState[minUsageIndex].usage}`);
     
     updateSlotsList();
     
@@ -276,7 +261,7 @@ export async function updateSlotsList() {
         const slotsData = await getAllSlotsInfo();
         const totalSlots = slotsData ? getSlotsCountFromData(slotsData) : 0;
         
-        let html = '<ul style="margin: 5px 0; padding-left: 20px;">';
+        let html = '<ul style="margin: 5px 0; padding-left: 0px;">';
         let usedCount = 0;
         
         for (let i = 0; i < slotsState.length; i++) {
@@ -292,7 +277,7 @@ export async function updateSlotsList() {
             
             // Кнопка сохранения (только для занятых слотов)
             if (isUsed) {
-                html += `<button class="kv-cache-save-slot-button" data-slot-index="${i}" data-character-name="${characterName}" style="background: none; border: none; cursor: pointer; padding: 2px 4px; display: inline-flex; align-items: center; color: var(--SmartThemeBodyColor, #888);" title="Сохранить кеш для ${characterName}">`;
+                html += `<button class="kv-cache-save-slot-button" data-slot-index="${i}" data-character-name="${characterName}" style="background: none; cursor: pointer; padding: 2px 4px; display: inline-flex; align-items: center; color: var(--SmartThemeBodyColor, #888); margin-left: 0;" title="Сохранить кеш для ${characterName}">`;
                 html += `<i class="fa-solid fa-floppy-disk" style="font-size: 0.85em;"></i>`;
                 html += `</button>`;
             } else {
@@ -376,17 +361,13 @@ async function processChatChange(previousChatIdParam, currentChatId, extensionSe
     
     // Если имя чата не изменилось или меняется с/на unknown - не запускаем очистку
     if (!chatIdChanged) {
-        console.debug(`[KV Cache Manager] Имя чата не изменилось (${previousChatIdParam} -> ${currentChatId}) или меняется с/на unknown, пропускаем очистку`);
         return false;
     }
     
     // Проверяем настройку очистки при смене чата
     if (!extensionSettings.clearOnChatChange) {
-        console.debug(`[KV Cache Manager] Очистка при смене чата отключена в настройках`);
         return false;
     }
-    
-    console.debug(`[KV Cache Manager] Смена чата: ${previousChatIdParam} -> ${currentChatId}`);
     
     // ВАЖНО: Сначала сохраняем кеш для всех персонажей, которые были в слотах
     await saveAllSlotsCache();

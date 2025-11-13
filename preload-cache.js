@@ -116,15 +116,26 @@ export async function preloadCharactersCache(characters) {
                 const generationPromise = new Promise((resolve, reject) => {
                     const timeout = setTimeout(() => {
                         if (!generationStarted) {
-                            eventSource.off(event_types.GENERATION_AFTER_COMMANDS, handler);
+                            // Отписываемся от события при таймауте
+                            if (abortHandler) {
+                                eventSource.removeListener(event_types.GENERATION_AFTER_COMMANDS, abortHandler);
+                            }
                             reject(new Error('Таймаут ожидания начала генерации'));
                         }
                     }, 30000); // 30 секунд таймаут
                     
+                    // Создаем обработчик и сохраняем ссылку на него
                     const handler = () => {
+                        // Проверяем, что обработчик еще не был вызван
+                        if (generationStarted) {
+                            return;
+                        }
+                        
                         generationStarted = true;
                         clearTimeout(timeout);
-                        eventSource.off(event_types.GENERATION_AFTER_COMMANDS, handler);
+                        
+                        // Отписываемся от события (передаем ту же функцию, что использовалась при подписке)
+                        eventSource.removeListener(event_types.GENERATION_AFTER_COMMANDS, handler);
                         
                         // Останавливаем генерацию после обработки промпта
                         // Пытаемся получить abortController из глобального контекста
@@ -143,7 +154,10 @@ export async function preloadCharactersCache(characters) {
                         resolve();
                     };
                     
+                    // Сохраняем ссылку на обработчик для возможности отписки
                     abortHandler = handler;
+                    
+                    // Подписываемся на событие
                     eventSource.on(event_types.GENERATION_AFTER_COMMANDS, handler);
                 });
                 
@@ -176,9 +190,9 @@ export async function preloadCharactersCache(characters) {
                         throw e;
                     }
                 } finally {
-                    // Убеждаемся, что обработчик удален
-                    if (abortHandler) {
-                        eventSource.off(event_types.GENERATION_AFTER_COMMANDS, abortHandler);
+                    // Убеждаемся, что обработчик удален (передаем ту же функцию, что использовалась при подписке)
+                    if (abortHandler && !generationStarted) {
+                        eventSource.removeListener(event_types.GENERATION_AFTER_COMMANDS, abortHandler);
                     }
                 }
                 

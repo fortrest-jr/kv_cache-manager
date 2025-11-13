@@ -677,8 +677,8 @@ export async function loadSelectedCache() {
             showToast('success', `Успешно загружено ${loadedCount} персонажей`, 'Загрузка');
         }
         
-        // Обновляем список слотов
-        setTimeout(() => updateSlotsList(), 1000);
+        // Обновляем список слотов (loadSlotCache() уже обновляет после каждой загрузки, но финальное обновление гарантирует актуальность)
+        updateSlotsList();
     } else {
         showToast('error', `Не удалось загрузить кеши. Ошибки: ${errors.join(', ')}`, 'Загрузка');
     }

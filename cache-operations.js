@@ -78,6 +78,10 @@ export async function loadSlotCache(slotId, filename) {
         setSlotCacheLoaded(slotId, true);
         
         console.debug(`[KV Cache Manager] Кеш успешно загружен для слота ${slotId}, счетчик использования сброшен в 0, cacheLoaded установлен в true`);
+        
+        // Обновляем список слотов после загрузки
+        updateSlotsList();
+        
         return true;
     } catch (e) {
         console.error(`[KV Cache Manager] Ошибка загрузки кеша слота ${slotId}:`, e);
@@ -93,6 +97,10 @@ export async function clearSlotCache(slotId) {
         await llamaApi.clearSlotCache(slotId);
         
         console.debug(`[KV Cache Manager] Кеш успешно очищен для слота ${slotId}`);
+        
+        // Обновляем список слотов после очистки
+        updateSlotsList();
+        
         return true;
     } catch (e) {
         console.error(`[KV Cache Manager] Ошибка очистки слота ${slotId}:`, e);
@@ -147,8 +155,8 @@ export async function clearAllSlotsCache() {
                 showToast('success', `Успешно очищено ${clearedCount} слотов`, 'Очистка кеша');
             }
             
-            // Обновляем список слотов после очистки
-            setTimeout(() => updateSlotsList(), 1000);
+            // Обновляем список слотов после очистки (clearSlotCache() уже обновляет после каждой очистки, но финальное обновление гарантирует актуальность)
+            updateSlotsList();
             
             return true;
         } else {

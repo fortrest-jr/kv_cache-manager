@@ -14,7 +14,7 @@
                     </div>
                 </div>
                 <div class="kv-cache-manager-field flex-container">
-                    <input id="kv-cache-save-now-button" class="menu_button" type="submit" value="Сохранить сейчас" />
+                    <input id="kv-cache-save-now-button" class="menu_button" type="submit" value="Сохранить все" />
                 </div>
                 <div class="kv-cache-manager-field flex-container">
                     <input id="kv-cache-save-button" class="menu_button" type="submit" value="Сохранить с именем" />
@@ -22,35 +22,8 @@
                 <div class="kv-cache-manager-field flex-container">
                     <input id="kv-cache-load-button" class="menu_button" type="submit" value="Загрузить кеш" />
                 </div>
-            </div>
-
-            <hr class="sysHR" />
-
-            <div class="kv-cache-manager-section">
-                <h3>Дополнительные настройки</h3>
                 <div class="kv-cache-manager-field flex-container">
-                    <input type="checkbox" id="kv-cache-show-notifications" />
-                    <label for="kv-cache-show-notifications">Показывать уведомления</label>
-                </div>
-                <div class="kv-cache-manager-field flex-container">
-                    <input type="checkbox" id="kv-cache-clear-on-chat-change" />
-                    <label for="kv-cache-clear-on-chat-change">Очищать кеш при смене чата</label>
-                </div>
-            </div>
-
-            <hr class="sysHR" />
-
-            <div class="kv-cache-manager-section">
-                <h3>Режим групповых чатов</h3>
-                <div class="kv-cache-manager-field flex-container">
-                    <input id="kv-cache-preload-characters-button" class="menu_button" type="submit" value="Предзагрузить всех персонажей группы" />
-                </div>
-                <div class="kv-cache-manager-field flex-container">
-                    <label for="kv-cache-preload-timeout">Таймаут предзагрузки (минуты):</label>
-                    <input type="number" id="kv-cache-preload-timeout" class="text_pole" min="1" value="20" />
-                </div>
-                <div class="kv-cache-manager-field flex-container">
-                    <input id="kv-cache-release-all-slots-button" class="menu_button" type="submit" value="Освободить все слоты" />
+                    <input id="kv-cache-release-all-slots-button" class="menu_button" type="submit" value="Очистить все слоты" />
                 </div>
             </div>
 
@@ -69,6 +42,33 @@
                 <div class="kv-cache-manager-field flex-container">
                     <label for="kv-cache-max-files">Максимум файлов на персонажа:</label>
                     <input type="number" id="kv-cache-max-files" class="text_pole" min="1" value="10" />
+                </div>
+            </div>
+
+            <hr class="sysHR" />
+
+            <div class="kv-cache-manager-section">
+                <h3>Групповой кеш</h3>
+                <div class="kv-cache-manager-field flex-container">
+                    <input id="kv-cache-preload-characters-button" class="menu_button" type="submit" value="Создать кеш для персонажей группы" />
+                </div>
+                <div class="kv-cache-manager-field flex-container">
+                    <label for="kv-cache-preload-timeout">Таймаут прогрузки (минуты):</label>
+                    <input type="number" id="kv-cache-preload-timeout" class="text_pole" min="1" value="20" />
+                </div>
+            </div>
+
+            <hr class="sysHR" />
+
+            <div class="kv-cache-manager-section">
+                <h3>Дополнительные настройки</h3>
+                <div class="kv-cache-manager-field flex-container">
+                    <input type="checkbox" id="kv-cache-show-notifications" />
+                    <label for="kv-cache-show-notifications">Показывать уведомления</label>
+                </div>
+                <div class="kv-cache-manager-field flex-container">
+                    <input type="checkbox" id="kv-cache-clear-on-chat-change" />
+                    <label for="kv-cache-clear-on-chat-change">Очищать кеш при смене чата</label>
                 </div>
             </div>
 

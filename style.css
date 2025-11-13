@@ -48,7 +48,7 @@
 
 .kv-cache-manager-info {
     margin-top: 10px;
-    padding: 10px;
+    padding: 0px;
     border-left: 3px solid var(--SmartThemeBlurTintColor);
 }
 
@@ -59,7 +59,7 @@
 #kv-cache-slots-list ul {
     list-style-type: disc;
     margin: 5px 0;
-    padding-left: 20px;
+    padding-left: 0px;
 }
 
 #kv-cache-slots-list li {

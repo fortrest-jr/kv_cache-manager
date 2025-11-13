@@ -276,7 +276,7 @@ export async function updateSlotsList() {
         const slotsData = await getAllSlotsInfo();
         const totalSlots = slotsData ? getSlotsCountFromData(slotsData) : 0;
         
-        let html = '<ul style="margin: 5px 0; padding-left: 20px;">';
+        let html = '<ul style="margin: 5px 0; padding-left: 0px;">';
         let usedCount = 0;
         
         for (let i = 0; i < slotsState.length; i++) {

@@ -155,7 +155,7 @@ export function renderPreloadPopupCharacters(context = document) {
     const searchQuery = preloadPopupData.searchQuery.toLowerCase();
     
     if (characters.length === 0) {
-        charactersList.html(`<div class="kv-cache-preload-empty">${t`No characters for preload`}</div>`);
+        charactersList.html(`<div class="kv-cache-preload-empty">` + t`No characters for preload` + `</div>`);
         return;
     }
     
@@ -167,7 +167,7 @@ export function renderPreloadPopupCharacters(context = document) {
     });
     
     if (filteredCharacters.length === 0) {
-        charactersList.html(`<div class="kv-cache-preload-empty">${t`No characters found for query`}</div>`);
+        charactersList.html(`<div class="kv-cache-preload-empty">` + t`No characters found for query` + `</div>`);
         return;
     }
     
@@ -191,7 +191,7 @@ export function renderPreloadPopupCharacters(context = document) {
                             <i class="fa-solid fa-user" style="margin-right: 5px;"></i>
                             ${character.name}
                         </div>
-                        ${character.isMuted ? `<div style="font-size: 0.85em; margin-top: 2px; text-align: left;">${t`(muted)`}</div>` : ''}
+                        ${character.isMuted ? `<div style="font-size: 0.85em; margin-top: 2px; text-align: left;">` + t`(muted)` + `</div>` : ''}
                     </div>
                 </label>
             </div>
@@ -281,7 +281,7 @@ export function updatePreloadPopupSelection(context = document) {
             .join(', ');
         
         const characterPlural = selectedCount !== 1 ? 's' : '';
-        selectedInfo.html(`<strong>${t`Selected: ${selectedCount} character${characterPlural} (${selectedNames})`}</strong>`);
+        selectedInfo.html(`<strong>` + t`Selected: ${selectedCount} character${characterPlural} (${selectedNames})` + `</strong>`);
         // Включаем кнопку "Начать предзагрузку"
         if (preloadButton) {
             preloadButton.disabled = false;

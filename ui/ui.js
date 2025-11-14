@@ -83,7 +83,7 @@ export async function onLoadButtonClick() {
 
 export async function onReleaseAllSlotsButtonClick() {
     // Показываем попап подтверждения
-    const confirmationMessage = `<p style="margin: 10px 0; font-size: 14px;">${t`Are you sure you want to clear all slots?`}</p><p style="margin: 10px 0; font-size: 12px; color: var(--SmartThemeBodyColor, #888);">${t`All data in slots will be deleted.`}</p>`;
+    const confirmationMessage = `<p style="margin: 10px 0; font-size: 14px;">` + t`Are you sure you want to clear all slots?` + `</p><p style="margin: 10px 0; font-size: 12px; color: var(--SmartThemeBodyColor, #888);">${t`All data in slots will be deleted.`}</p>`;
     
     const result = await callGenericPopup(
         confirmationMessage,

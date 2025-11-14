@@ -286,14 +286,14 @@ export async function updateSlotsList() {
                 html += `<span style="width: 20px; display: inline-block;"></span>`;
             }
             
-            html += `<span>${t`Slot ${i}:`} `;
+            html += `<span>` + t`Slot ${i}:`;
             
             if (isUsed) {
                 const messageCount = slot?.usage || 0;
                 html += `<span style="color: var(--SmartThemeBodyColor, inherit);">${characterName}</span> `;
-                html += `<span style="font-size: 0.85em; color: var(--SmartThemeBodyColor, #888);">${t`[messages: ${messageCount}]`}</span>`;
+                html += `<span style="font-size: 0.85em; color: var(--SmartThemeBodyColor, #888);">` + t`[messages: ${messageCount}]` + `</span>`;
             } else {
-                html += `<span style="color: #888; font-style: italic;">${t`(free)`}</span>`;
+                html += `<span style="color: #888; font-style: italic;">` + t`(free)` + `</span>`;
             }
             
             html += `</span></li>`;

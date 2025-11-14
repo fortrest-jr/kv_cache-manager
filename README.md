@@ -1,295 +1,347 @@
-# KV Cache Manager для SillyTavern
+# KV Cache Manager for SillyTavern
 
-Расширение для управления KV-кешем llama.cpp сервера с автоматическим сохранением и загрузкой кеша. Поддерживает как одиночные, так и групповые чаты с несколькими персонажами.
+[Русская версия](README.ru.md) | **English**
 
-## Установка
+An extension for managing KV cache of llama.cpp server with automatic saving and loading. Supports both single and group chats with multiple characters.
 
-Через меню расширений SillyTavern.
+## Installation
 
-### Ручная установка
+Through SillyTavern extensions menu.
 
-1. Скопируйте папку `kv-cache-manager` в `public/scripts/extensions/` вашей установки SillyTavern
-2. Перезагрузите страницу SillyTavern
-3. Расширение появится в настройках на вкладке "KV Cache Manager"
+### Manual Installation
 
-### Серверный плагин
+1. Copy the `kv-cache-manager` folder to `public/scripts/extensions/` in your SillyTavern installation
+2. Reload the SillyTavern page
+3. The extension will appear in settings under the "KV Cache Manager" tab
 
-Для работы функции загрузки файлов необходимо установить серверный плагин:
+### Server Plugin
 
-**Серверный плагин KV Cache Manager**: [https://github.com/fortrest-jr/kv_cache-manager-plugin](https://github.com/fortrest-jr/kv_cache-manager-plugin)
+For file loading functionality, you need to install the server plugin:
 
-Плагин предоставляет API для получения списка файлов сохранений и их удаления. Без установки плагина функция загрузки кеша будет недоступна.
+**KV Cache Manager Server Plugin**: [https://github.com/fortrest-jr/kv_cache-manager-plugin](https://github.com/fortrest-jr/kv_cache-manager-plugin)
 
-## Сценарии использования
+The plugin provides API for getting the list of save files and deleting them. Without the plugin, the cache loading function will be unavailable.
 
-### Сценарий 1: Обычный чат с одним персонажем
+## Use Cases
 
-1. **Начало работы**: Откройте чат с персонажем и начните генерацию ответа
-   - Расширение автоматически выделит слот для персонажа
-   - При первой генерации кеш будет пустым
+### Use Case 1: Regular Chat with One Character
 
-2. **Автоматическое сохранение**: После каждых N сообщений (по умолчанию 5) кеш автоматически сохраняется
-   - Индикатор в заголовке расширения показывает количество сообщений до следующего сохранения
-   - Старые автосохранения автоматически удаляются при превышении лимита
+1. **Getting Started**: Open a chat with a character and start generating a response
+   - The extension will automatically allocate a slot for the character
+   - On first generation, the cache will be empty
 
-3. **Автоматическая загрузка**: При следующей генерации ответа последний сохраненный кеш автоматически загружается
-   - Уведомление показывает дату/время загруженного кеша
+2. **Automatic Saving**: After every N messages (default: 5), the cache is automatically saved
+   - The indicator in the extension header shows the number of messages until the next save
+   - Old autosaves are automatically deleted when the limit is exceeded
 
-4. **Ручное сохранение важных моментов**: 
-   - Нажмите "Сохранить с именем" и введите тег (например, "важный_момент")
-   - Кеш будет сохранен с тегом и не будет удален при ротации автосохранений
+3. **Automatic Loading**: On the next response generation, the last saved cache is automatically loaded
+   - A notification shows the date/time of the loaded cache
 
-### Сценарий 2: Групповой чат с несколькими персонажами
+4. **Manual Saving of Important Moments**: 
+   - Click "Save with Name" and enter a tag (e.g., "important_moment")
+   - The cache will be saved with the tag and won't be deleted during autosave rotation
 
-1. **Распределение по слотам**: При генерации ответов разных персонажей они автоматически распределяются по доступным слотам
-   - Каждый персонаж получает свой слот
-   - Счетчик использования отслеживается для каждого слота отдельно
+### Use Case 2: Group Chat with Multiple Characters
 
-2. **Вытеснение слотов**: Если слотов меньше, чем персонажей:
-   - Персонаж с наименьшим использованием вытесняется
-   - Перед вытеснением кеш автоматически сохраняется (если использовался минимум 2 раза)
-   - Новый персонаж занимает освобожденный слот
+1. **Slot Distribution**: When generating responses for different characters, they are automatically distributed across available slots
+   - Each character gets their own slot
+   - Usage counter is tracked separately for each slot
 
-3. **Независимое автосохранение**: Каждый персонаж имеет свой счетчик сообщений
-   - Кеш сохраняется независимо для каждого персонажа
-   - Ротация файлов происходит отдельно для каждого персонажа
+2. **Slot Eviction**: If there are fewer slots than characters:
+   - The character with the least usage is evicted
+   - Before eviction, the cache is automatically saved (if used at least 1 time)
+   - The new character occupies the freed slot
 
-4. **Сохранение отдельных слотов**: 
-   - В интерфейсе управления слотами есть кнопка сохранения для каждого слота
-   - Позволяет сохранить кеш конкретного персонажа без сохранения остальных
+3. **Independent Autosave**: Each character has their own message counter
+   - Cache is saved independently for each character
+   - File rotation occurs separately for each character
 
-### Сценарий 3: Переключение между чатами
+4. **Saving Individual Slots**: 
+   - In the slot management interface, there's a save button for each slot
+   - Allows saving the cache of a specific character without saving the others
 
-1. **Автоматическое сохранение**: При переключении на другой чат:
-   - Кеш всех персонажей текущего чата автоматически сохраняется (если использовался минимум 2 раза)
-   - Все слоты очищаются на сервере
+### Use Case 3: Switching Between Chats
 
-2. **Распределение нового чата**: Персонажи нового чата автоматически распределяются по слотам
-   - Для групповых чатов все участники распределяются по доступным слотам
-   - Для обычных чатов один персонаж занимает первый слот
+1. **Automatic Saving**: When switching to another chat:
+   - Cache of all characters in the current chat is automatically saved (if used at least 1 time)
+   - All slots are cleared on the server
 
-3. **Автозагрузка при генерации**: При первой генерации в новом чате:
-   - Автоматически загружается последний сохраненный кеш для каждого персонажа из этого чата
-   - Если кеша нет, генерация продолжается с пустым кешем
+2. **New Chat Distribution**: Characters of the new chat are automatically distributed across slots
+   - For group chats, all participants are distributed across available slots
+   - For regular chats, one character occupies the first slot
 
-### Сценарий 4: Ручная загрузка сохранений
+3. **Autoload on Generation**: On first generation in a new chat:
+   - The last saved cache for each character from this chat is automatically loaded
+   - If no cache exists, generation continues with an empty cache
 
-1. **Открытие popup загрузки**: Нажмите кнопку "Загрузить кеш"
+### Use Case 4: Manual Loading of Saves
 
-2. **Выбор чата**: 
-   - Текущий чат отображается первым с пометкой "[текущий]"
-   - Можно выбрать любой другой чат из списка
-   - Поиск по имени чата для быстрого доступа
+1. **Opening Load Popup**: Click the "Load Cache" button
 
-3. **Выбор персонажей**:
-   - Внутри выбранного чата отображаются все персонажи с сохранениями
-   - Каждый персонаж может иметь несколько сохранений (разверните группу)
-   - Выберите нужное сохранение для каждого персонажа (клик по дате/времени)
-   - Можно выбрать несколько персонажей одновременно
+2. **Selecting Chat**: 
+   - Current chat is displayed first with "[current]" label
+   - You can select any other chat from the list
+   - Search by chat name for quick access
 
-4. **Загрузка**:
-   - Нажмите кнопку "Загрузить"
-   - Кеши загружаются в соответствующие слоты
-   - Если персонаж уже в слоте, кеш загружается в этот же слот
-   - Если персонажа нет в слотах, для него выделяется новый слот
+3. **Selecting Characters**:
+   - Within the selected chat, all characters with saves are displayed
+   - Each character can have multiple saves (expand the group)
+   - Select the desired save for each character (click on date/time)
+   - You can select multiple characters simultaneously
 
-5. **Загрузка из другого чата**:
-   - Можно загрузить кеш персонажа из другого чата
-   - В уведомлении будет указано, из какого чата загружен кеш
+4. **Loading**:
+   - Click the "Load" button
+   - Caches are loaded into corresponding slots
+   - If the character is already in a slot, the cache is loaded into that slot
+   - If the character is not in slots, a new slot is allocated for them
 
-### Сценарий 5: Управление сохранениями
+5. **Loading from Another Chat**:
+   - You can load a character's cache from another chat
+   - The notification will indicate which chat the cache was loaded from
 
-1. **Ручное сохранение с тегом**: 
-   - Нажмите "Сохранить с именем"
-   - Введите тег (например, "конец_главы_1")
-   - Кеш всех активных персонажей будет сохранен с этим тегом
-   - Сохранения с тегами не удаляются при ротации автосохранений
+### Use Case 5: Preloading Cache for Group Chats
 
-2. **Мгновенное сохранение**: 
-   - Нажмите "Сохранить сейчас"
-   - Кеш сохранится без тега (как автосохранение)
-   - Счетчики сообщений сбросятся для всех персонажей
+1. **Opening Preload Popup**: 
+   - Click "Create Cache for Group Characters" button (only available in group chats)
+   - A popup will open showing all characters in the group chat
 
-3. **Освобождение слотов**: 
-   - Нажмите "Освободить все слоты"
-   - Все слоты будут очищены (кеш на сервере не удаляется)
-   - Полезно для принудительного перераспределения персонажей
+2. **Selecting Characters**:
+   - By default, all non-muted characters are selected
+   - You can select/deselect characters using checkboxes
+   - Muted characters are shown but not selected by default
+   - Use "Select All" checkbox to select/deselect all characters
+   - Search by character name for quick access
 
-## Основные возможности
+3. **Preloading Process**:
+   - Click "Start Preload" to begin
+   - For each selected character, the extension will:
+     - Switch to that character's context
+     - Generate a quiet prompt (1 token) to warm up the cache
+     - Save the cache automatically
+   - Progress is shown in a status message with:
+     - Current character being preloaded
+     - Progress counter (X/Total)
+     - List of successfully preloaded characters
+     - List of errors (if any)
+   - You can cancel the process at any time
 
-### Автоматическое сохранение
-- **Интеллектуальное автосохранение**: Кеш автоматически сохраняется для каждого персонажа отдельно после каждых N сообщений (настраивается)
-- **Индивидуальные счетчики**: Каждый персонаж имеет свой счетчик сообщений, что позволяет сохранять кеш независимо для разных персонажей
-- **Визуальный индикатор**: Отображение количества сообщений до следующего автосохранения в заголовке расширения
-- **Автоматическая ротация**: Старые автосохранения автоматически удаляются при превышении лимита (настраивается отдельно для каждого персонажа)
+4. **Benefits**:
+   - All characters have their cache ready before actual conversations
+   - Faster response times during group chat interactions
+   - Automatic slot allocation and cache management
 
-### Ручное сохранение
-- **Сохранение с тегом**: Сохранение кеша для всех активных персонажей с указанным тегом (имя сохранения)
-- **Мгновенное сохранение**: Сохранение без тега для всех активных персонажей (автосохранение по требованию)
-- **Сохранение отдельных слотов**: Кнопка сохранения для каждого слота отдельно прямо из интерфейса управления слотами
+### Use Case 6: Managing Saves
 
-### Автоматическая загрузка
-- **Загрузка при генерации**: При начале генерации ответа персонажа автоматически загружается последний сохраненный кеш из текущего чата
-- **Умное управление слотами**: Автоматическое распределение персонажей по слотам с вытеснением наименее используемых
-- **Сохранение перед вытеснением**: Кеш персонажа автоматически сохраняется перед вытеснением из слота (если использовался минимум 2 раза)
+1. **Manual Save with Tag**: 
+   - Click "Save with Name"
+   - Enter a tag (e.g., "end_of_chapter_1")
+   - Cache of all active characters will be saved with this tag
+   - Saves with tags are not deleted during autosave rotation
 
-### Ручная загрузка
-- **Интерактивный popup**: Удобный интерфейс для выбора и загрузки сохранений
-- **Группировка по чатам**: Сохранения организованы по чатам с возможностью выбора любого чата
-- **Группировка по персонажам**: Внутри каждого чата сохранения сгруппированы по персонажам
-- **Множественный выбор**: Возможность выбрать несколько персонажей для одновременной загрузки
-- **Поиск**: Поиск по имени чата или персонажа
-- **Информация о сохранениях**: Отображение даты/времени сохранения и тегов
+2. **Instant Save**: 
+   - Click "Save Now"
+   - Cache will be saved without a tag (as autosave)
+   - Message counters will be reset for all characters
 
-### Управление слотами
-- **Автоматическое распределение**: Персонажи автоматически распределяются по слотам при генерации
-- **Отслеживание использования**: Счетчик использования каждого слота для оптимизации вытеснения
-- **Визуальный интерфейс**: Отображение состояния всех слотов с информацией о персонажах и использовании
-- **Освобождение слотов**: Кнопка для освобождения всех слотов вручную
+3. **Freeing Slots**: 
+   - Click "Clear All Slots"
+   - All slots will be cleared (cache on server is not deleted)
+   - Useful for forcing character redistribution
 
-### Управление при смене чата
-- **Автоматическое сохранение**: При переключении на другой чат кеш всех персонажей автоматически сохраняется (если персонаж использовал слот минимум 2 раза)
-- **Очистка слотов**: Автоматическая очистка всех слотов перед распределением персонажей нового чата
-- **Распределение персонажей**: Автоматическое распределение персонажей нового чата по слотам
+## Key Features
 
-### Валидация и безопасность
-- **Проверка размера файлов**: Автоматическая проверка размера сохраненных файлов (файлы меньше 1 МБ считаются невалидными и удаляются)
-- **Обработка ошибок**: Корректная обработка ошибок с информативными сообщениями
-- **Защита от потери данных**: Сохранение кеша перед вытеснением персонажей из слотов
+### Automatic Saving
+- **Smart Autosave**: Cache is automatically saved for each character separately after every N messages (configurable)
+- **Individual Counters**: Each character has their own message counter, allowing independent cache saving for different characters
+- **Visual Indicator**: Display of the number of messages until the next autosave in the extension header
+- **Automatic Rotation**: Old autosaves are automatically deleted when the limit is exceeded (configurable separately for each character)
 
-## Настройки
+### Manual Saving
+- **Save with Tag**: Save cache for all active characters with a specified tag (save name)
+- **Instant Save**: Save without tag for all active characters (on-demand autosave)
+- **Save Individual Slots**: Save button for each slot separately directly from the slot management interface
 
-### Включить автосохранение
-- **Описание**: Включает/выключает автоматическое сохранение кеша
-- **По умолчанию**: Включено
-- **Рекомендации**: Рекомендуется оставить включенным для автоматического сохранения прогресса
+### Automatic Loading
+- **Load on Generation**: When starting to generate a character's response, the last saved cache from the current chat is automatically loaded
+- **Smart Slot Management**: Automatic distribution of characters across slots with eviction of least used ones
+- **Save Before Eviction**: Character cache is automatically saved before eviction from slot (if used at least 1 time)
 
-### Сохранять каждые N сообщений
-- **Описание**: Интервал автоматического сохранения кеша для каждого персонажа
-- **По умолчанию**: 5 сообщений
-- **Как работает**: Каждый персонаж имеет свой счетчик сообщений. Когда счетчик достигает указанного значения, кеш автоматически сохраняется и счетчик сбрасывается
-- **Рекомендации**: 
-  - Меньшие значения (3-5) - для частого сохранения, больше места на диске
-  - Большие значения (10-20) - для редкого сохранения, экономия места
+### Preloading for Group Chats
+- **Batch Cache Creation**: Create cache for multiple characters in group chats at once
+- **Quiet Generation**: Uses quiet generation mode (1 token) to warm up cache without visible messages
+- **Progress Tracking**: Real-time status updates showing current character, progress, and results
+- **Cancellable**: Can be cancelled at any time during the process
+- **Selective Preloading**: Choose which characters to preload (muted characters excluded by default)
+- **Automatic Slot Management**: Characters are automatically assigned to slots during preloading
 
-### Максимум файлов на персонажа
-- **Описание**: Максимальное количество автосохранений для каждого персонажа в каждом чате
-- **По умолчанию**: 10 файлов
-- **Как работает**: При превышении лимита старые автосохранения автоматически удаляются (новые сохраняются)
-- **Важно**: Ручные сохранения с тегами не учитываются в этом лимите и не удаляются
-- **Рекомендации**: 
-  - 5-10 файлов - для экономии места
-  - 15-20 файлов - для большего количества точек восстановления
+### Manual Loading
+- **Interactive Popup**: Convenient interface for selecting and loading saves
+- **Grouped by Chats**: Saves are organized by chats with the ability to select any chat
+- **Grouped by Characters**: Within each chat, saves are grouped by characters
+- **Multiple Selection**: Ability to select multiple characters for simultaneous loading
+- **Search**: Search by chat name or character name
+- **Save Information**: Display of save date/time and tags
 
-### Показывать уведомления
-- **Описание**: Включает/выключает toast-уведомления о сохранении, загрузке и других операциях
-- **По умолчанию**: Включено
-- **Рекомендации**: Отключите, если уведомления мешают работе
+### Slot Management
+- **Automatic Distribution**: Characters are automatically distributed across slots during generation
+- **Usage Tracking**: Usage counter for each slot to optimize eviction
+- **Visual Interface**: Display of all slots' status with information about characters and usage
+- **Freeing Slots**: Button to free all slots manually
 
-### Очистка при смене чата
-- **Описание**: Автоматически сохраняет кеш и очищает слоты при переключении на другой чат
-- **По умолчанию**: Включено
-- **Как работает**: 
-  - При смене чата кеш всех персонажей сохраняется (если использовался минимум 2 раза)
-  - Все слоты очищаются на сервере
-  - Персонажи нового чата распределяются по слотам
-- **Рекомендации**: 
-  - Включено - для автоматического управления при работе с несколькими чатами
-  - Выключено - если хотите вручную управлять переключением между чатами
+### Management on Chat Change
+- **Automatic Saving**: When switching to another chat, cache of all characters is automatically saved (if the character used the slot at least 1 time)
+- **Slot Clearing**: Automatic clearing of all slots before distributing characters of the new chat
+- **Character Distribution**: Automatic distribution of new chat characters across slots
 
-## Формат файлов
+### Validation and Security
+- **File Size Check**: Automatic check of saved file sizes (files smaller than 1 MB are considered invalid and deleted)
+- **Error Handling**: Proper error handling with informative messages
+- **Data Loss Protection**: Saving cache before evicting characters from slots
 
-Расширение использует единый формат имен файлов для всех типов сохранений:
+## Settings
 
-### Автосохранения (без тега)
+### Enable Autosave
+- **Description**: Enables/disables automatic cache saving
+- **Default**: Enabled
+- **Recommendations**: Recommended to keep enabled for automatic progress saving
+
+### Save Every N Messages
+- **Description**: Interval for automatic cache saving for each character
+- **Default**: 5 messages
+- **How it works**: Each character has their own message counter. When the counter reaches the specified value, the cache is automatically saved and the counter is reset
+- **Recommendations**: 
+  - Smaller values (3-5) - for frequent saving, more disk space
+  - Larger values (10-20) - for rare saving, save space
+
+### Maximum Files per Character
+- **Description**: Maximum number of autosaves for each character in each chat
+- **Default**: 10 files
+- **How it works**: When the limit is exceeded, old autosaves are automatically deleted (new ones are saved)
+- **Important**: Manual saves with tags are not counted in this limit and are not deleted
+- **Recommendations**: 
+  - 5-10 files - to save space
+  - 15-20 files - for more restore points
+
+### Show Notifications
+- **Description**: Enables/disables toast notifications about saving, loading, and other operations
+- **Default**: Enabled
+- **Recommendations**: Disable if notifications interfere with work
+
+### Clear on Chat Change
+- **Description**: Automatically saves cache and clears slots when switching to another chat
+- **Default**: Enabled
+- **How it works**: 
+  - When changing chats, cache of all characters is saved (if used at least 1 time)
+  - All slots are cleared on the server
+  - Characters of the new chat are distributed across slots
+- **Recommendations**: 
+  - Enabled - for automatic management when working with multiple chats
+  - Disabled - if you want to manually manage switching between chats
+
+### Preload Timeout (minutes)
+- **Description**: Maximum time to wait for each character's cache generation during preload
+- **Default**: 20 minutes
+- **How it works**: 
+  - When preloading cache for group chat characters, each character has a timeout
+  - If generation takes longer than the timeout, it will be cancelled and marked as error
+  - The process continues with the next character
+- **Recommendations**: 
+  - 10-15 minutes - for faster models or smaller contexts
+  - 20-30 minutes - for slower models or larger contexts
+  - Increase if you experience frequent timeouts during preloading
+
+## File Format
+
+The extension uses a unified file naming format for all types of saves:
+
+### Autosaves (without tag)
 ```
 {chatId}_{timestamp}_character_{characterName}.bin
 ```
 
-**Пример**: `chat1_20240115143022_character_Alice.bin`
+**Example**: `chat1_20240115143022_character_Alice.bin`
 
-### Ручные сохранения (с тегом)
+### Manual Saves (with tag)
 ```
 {chatId}_{timestamp}_tag_{tag}_character_{characterName}.bin
 ```
 
-**Пример**: `chat1_20240115143022_tag_важный_момент_character_Alice.bin`
+**Example**: `chat1_20240115143022_tag_important_moment_character_Alice.bin`
 
-### Структура имени файла
-- **chatId**: Нормализованное имя чата (без специальных символов)
-- **timestamp**: Временная метка в формате `YYYYMMDDHHmmss` (14 цифр)
-- **tag**: Тег для ручного сохранения (опционально, только для ручных сохранений)
-- **characterName**: Имя персонажа (используется для идентификации при загрузке)
+### File Name Structure
+- **chatId**: Normalized chat name (without special characters)
+- **timestamp**: Timestamp in format `YYYYMMDDHHmmss` (14 digits)
+- **tag**: Tag for manual save (optional, only for manual saves)
+- **characterName**: Character name (used for identification when loading)
 
-### Важные особенности
-- **Имена персонажей вместо слотов**: Файлы именуются по персонажам, а не по номерам слотов, что обеспечивает корректную загрузку даже при изменении порядка слотов
-- **Нормализация имен**: Все имена (чата, персонажа, тега) нормализуются для безопасного использования в именах файлов
-- **Обратная совместимость**: Поддерживается парсинг старых форматов файлов (с номерами слотов) для совместимости
+### Important Features
+- **Character Names Instead of Slots**: Files are named by characters, not by slot numbers, ensuring correct loading even when slot order changes
+- **Name Normalization**: All names (chat, character, tag) are normalized for safe use in file names
+- **Backward Compatibility**: Support for parsing old file formats (with slot numbers) for compatibility
 
-### Валидация файлов
-- Файлы размером меньше 1 МБ считаются невалидными и автоматически удаляются
-- Проверка размера происходит после сохранения с небольшой задержкой (500 мс)
+### File Validation
+- Files smaller than 1 MB are considered invalid and automatically deleted
+- Size check occurs after saving with a small delay (500 ms)
 
-## Технические детали
+## Technical Details
 
-### Управление слотами
+### Slot Management
 
-Расширение использует систему слотов llama.cpp сервера для управления кешем нескольких персонажей одновременно.
+The extension uses the llama.cpp server slot system to manage cache for multiple characters simultaneously.
 
-**Алгоритм выделения слотов:**
-1. Если персонаж уже в слоте - используется существующий слот
-2. Если есть свободный слот - персонаж занимает его
-3. Если свободных слотов нет - вытесняется персонаж с наименьшим счетчиком использования
-4. Перед вытеснением кеш сохраняется (если использовался минимум 2 раза)
+**Slot Allocation Algorithm:**
+1. If the character is already in a slot - the existing slot is used
+2. If there's a free slot - the character occupies it
+3. If there are no free slots - the character with the lowest usage counter is evicted
+4. Before eviction, the cache is saved (if used at least 1 time)
 
-**Счетчик использования:**
-- Увеличивается при каждой новой генерации ответа (`type === 'normal'`)
-- Не увеличивается при свайпе или продолжении, если уже больше 0
-- Сбрасывается в 0 при загрузке кеша
-- Используется для определения наименее используемого слота при вытеснении
+**Usage Counter:**
+- Increases on each new response generation (`type === 'normal'`) or if counter is 0
+- Does not increase on swipe or continue if counter is already greater than 0
+- Resets to 0 when loading cache
+- Used to determine the least used slot during eviction
 
-### Перехват генерации
+### Generation Interception
 
-Расширение использует механизм перехватчиков генерации SillyTavern для автоматической загрузки кеша перед генерацией ответа.
+The extension uses SillyTavern's generation interceptor mechanism to automatically load cache before generating a response.
 
-**Типы генерации:**
-- `normal` - обычная генерация (увеличивает счетчик использования)
-- `regenerate` - регенерация (увеличивает счетчик, если равен 0)
-- `swipe` - свайп (не увеличивает счетчик, если больше 0)
-- `continue` - продолжение (не увеличивает счетчик, если больше 0)
-- `quiet` - тихая генерация (пропускается)
-- `impersonate` - генерация от имени пользователя (пропускается)
+**Generation Types:**
+- `normal` - normal generation (increases usage counter)
+- `regenerate` - regeneration (increases counter if equal to 0)
+- `swipe` - swipe (does not increase counter if greater than 0)
+- `continue` - continue (does not increase counter if greater than 0)
+- `quiet` - quiet generation (used for preloading, increases counter if equal to 0)
+- `impersonate` - generation on behalf of user (skipped)
 
-### События SillyTavern
+### SillyTavern Events
 
-Расширение подписывается на следующие события:
-- `GENERATE_BEFORE_COMBINE_PROMPTS` - обновление списка слотов перед генерацией
-- `TEXT_COMPLETION_SETTINGS_READY` - установка `id_slot` для генерации
-- `MESSAGE_RECEIVED` - обработка сообщений для автосохранения
-- `CHAT_CHANGED` - обработка смены чата
+The extension subscribes to the following events:
+- `GENERATE_BEFORE_COMBINE_PROMPTS` - updating slot list before generation
+- `TEXT_COMPLETION_SETTINGS_READY` - setting `id_slot` for generation
+- `MESSAGE_RECEIVED` - processing messages for autosave
+- `CHAT_CHANGED` - processing chat change
 
-### Нормализация имен
+### Name Normalization
 
-Все имена (чата, персонажа, тега) нормализуются для безопасного использования:
-- Удаление специальных символов
-- Замена пробелов на подчеркивания
-- Приведение к единому формату
+All names (chat, character, tag) are normalized for safe use:
+- Removal of special characters
+- Replacement of spaces with underscores
+- Conversion to unified format
 
-Это обеспечивает корректную работу с файловой системой и предотвращает проблемы с кодировкой.
+This ensures correct operation with the file system and prevents encoding issues.
 
-## Требования
+## Requirements
 
-- **SillyTavern**: Версия с поддержкой расширений и механизмом перехватчиков генерации
-- **llama.cpp сервер**: 
-  - Поддержка KV-кеша
-  - API для работы со слотами (`/slots`, `/slot/load`, `/slot/save`, `/slot/clear`)
-  - Поддержка параметра `id_slot` в запросах генерации
-- **Серверный плагин**: [kv_cache-manager-plugin](https://github.com/fortrest-jr/kv_cache-manager-plugin)
-  - Предоставляет API для получения списка файлов (`/api/files/list`)
-  - Предоставляет API для удаления файлов (`/api/files/delete`)
-  - Без установки плагина функция загрузки кеша будет недоступна
+- **SillyTavern**: Version with support for extensions and generation interceptor mechanism
+- **llama.cpp server**: 
+  - KV cache support
+  - API for working with slots (`/slots`, `/slot/load`, `/slot/save`, `/slot/clear`)
+  - Support for `id_slot` parameter in generation requests
+- **Server Plugin**: [kv_cache-manager-plugin](https://github.com/fortrest-jr/kv_cache-manager-plugin)
+  - Provides API for getting file list (`/api/files/list`)
+  - Provides API for deleting files (`/api/files/delete`)
+  - Without the plugin, the cache loading function will be unavailable
 
-## Лицензия
+## License
 
 MIT
-

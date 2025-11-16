@@ -1,7 +1,7 @@
 import { generateQuietPrompt } from "../../../../../script.js";
 
 import { getNormalizedChatId } from '../utils/utils.js';
-import { getExtensionSettings, LLAMA_HEARTBEAT_INTERVAL_MS } from '../settings.js';
+import { getExtensionSettings } from '../settings.js';
 import { getAllSlotsInfo } from './slot-manager.js';
 import { showToast } from '../ui/ui.js';
 
@@ -41,7 +41,7 @@ export function setPreloadModeChecker(checker) {
  */
 async function performHeartbeat() {
     const extensionSettings = getExtensionSettings();
-    if (!extensionSettings.heartbeat) {
+    if (extensionSettings.heartbeat <= 0) {
         return;
     }
 
@@ -84,15 +84,16 @@ export function startHeartbeat() {
     
     const extensionSettings = getExtensionSettings();
     
-    if (!extensionSettings.heartbeat) {
+    if (extensionSettings.heartbeat <= 0) {
         return;
     }
 
+    const intervalMs = extensionSettings.heartbeat * 1000;
     heartbeatInterval = setInterval(() => {
         performHeartbeat();
-    }, LLAMA_HEARTBEAT_INTERVAL_MS);
+    }, intervalMs);
 
-    console.log('[KV Cache Manager] Heartbeat started (every 30 seconds)');
+    console.log(`[KV Cache Manager] Heartbeat started (every ${extensionSettings.heartbeat} seconds)`);
 }
 
 /**

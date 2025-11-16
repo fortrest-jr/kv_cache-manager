@@ -40,9 +40,9 @@ jQuery(async () => {
     // Delegation for dynamic elements
     $(document).on("click", ".kv-cache-save-slot-button", onSaveSlotButtonClick);
     
-    // Start heartbeat if enabled
+    // Start heartbeat if enabled (value > 0)
     const extensionSettings = getExtensionSettings();
-    if (extensionSettings.heartbeat) {
+    if (extensionSettings.heartbeat && extensionSettings.heartbeat > 0) {
         startHeartbeat();
     }
     

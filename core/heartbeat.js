@@ -70,6 +70,7 @@ async function performHeartbeat() {
         });
         showToast('success', t`Heartbeat: LLM kept warm`, 'Heartbeat');
     } catch (e) {
+        showToast('error', t`Heartbeat: Generation error - ${e.message}`, 'Heartbeat');
         console.debug('[KV Cache Manager] Heartbeat generation error (ignored):', e);
     } finally {
         isHeartbeatGenerating = false;

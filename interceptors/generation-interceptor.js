@@ -8,6 +8,7 @@ import { getLastCacheForCharacter, parseSaveFilename } from '../core/file-manage
 import { showToast } from '../ui/ui.js';
 import { getNormalizedCharacterNameFromContext, getNormalizedCharacterNameFromData } from '../utils/character-utils.js';
 import { MIN_USAGE_FOR_SAVE } from '../settings.js';
+import { isHeartbeatActive, setPreloadModeChecker } from '../core/heartbeat.js';
 
 let currentSlot = null;
 let isPreloading = false;
@@ -20,6 +21,14 @@ export function setPreloadingMode(enabled) {
         currentPreloadCharacter = null;
     }
 }
+
+// Export function to check preload mode for heartbeat
+export function getPreloadingMode() {
+    return isPreloading;
+}
+
+// Initialize heartbeat preload mode checker
+setPreloadModeChecker(getPreloadingMode);
 
 export function setCurrentPreloadCharacter(normalizedName) {
     currentPreloadCharacter = normalizedName;
@@ -41,7 +50,8 @@ export async function KVCacheManagerInterceptor(chat, contextSize, abort, type) 
         return;
     }
     
-    if (type === 'quiet' && !isPreloading) {
+    // Allow quiet generations for preload or heartbeat
+    if (type === 'quiet' && !isPreloading && !isHeartbeatActive()) {
         return;
     }
     

@@ -2,6 +2,7 @@ import { extension_settings } from "../../../extensions.js";
 import { saveSettingsDebounced } from "../../../../script.js";
 import { showToast } from './ui/ui.js';
 import { updateSlotsList } from './core/slot-manager.js';
+import { startHeartbeat, stopHeartbeat } from './core/heartbeat.js';
 
 export const extensionName = "kv_cache-manager";
 export const extensionFolderPath = `scripts/extensions/third-party/${extensionName}`;
@@ -12,13 +13,16 @@ export const defaultSettings = {
     maxFiles: 10,
     showNotifications: true,
     clearOnChatChange: true,
-    preloadTimeout: 20
+    preloadTimeout: 20,
+    heartbeat: false
 };
 
 export const MIN_FILE_SIZE_MB = 1;
 export const FILE_CHECK_DELAY_MS = 500;
 
 export const MIN_USAGE_FOR_SAVE = 1;
+
+export const LLAMA_HEARTBEAT_INTERVAL_MS = 30000;
 
 export const LLAMA_API_TIMEOUTS = {
     GET_SLOTS: 10000,
@@ -55,6 +59,7 @@ export async function loadSettings() {
     $("#kv-cache-show-notifications").prop("checked", extensionSettings.showNotifications).trigger("input");
     $("#kv-cache-clear-on-chat-change").prop("checked", extensionSettings.clearOnChatChange).trigger("input");
     $("#kv-cache-preload-timeout").val(extensionSettings.preloadTimeout).trigger("input");
+    $("#kv-cache-heartbeat").prop("checked", extensionSettings.heartbeat).trigger("input");
     
     updateSlotsList();
 }
@@ -102,13 +107,27 @@ export function createSettingsHandlers() {
         saveSettingsDebounced();
     }
     
+    function onHeartbeatChange(event) {
+        const value = Boolean($(event.target).prop("checked"));
+        extensionSettings.heartbeat = value;
+        saveSettingsDebounced();
+        
+        // Start or stop heartbeat based on setting
+        if (value) {
+            startHeartbeat();
+        } else {
+            stopHeartbeat();
+        }
+    }
+    
     return {
         onEnabledChange,
         onSaveIntervalChange,
         onMaxFilesChange,
         onShowNotificationsChange,
         onClearOnChatChangeChange,
-        onPreloadTimeoutChange
+        onPreloadTimeoutChange,
+        onHeartbeatChange
     };
 }
 

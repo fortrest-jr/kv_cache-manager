@@ -111,5 +111,6 @@
     "Cache for ${0} loaded successfully": "Кеш для ${0} успешно загружен",
     "File not found for ${0}: ${1}": "Файл не найден для ${0}: ${1}",
     "File not found for ${0}": "Файл не найден для ${0}",
-    "Error intercepting generation: ${0}": "Ошибка при перехвате генерации: ${0}"
+    "Error intercepting generation: ${0}": "Ошибка при перехвате генерации: ${0}",
+    "Heartbeat (keep LLM warm)": "Heartbeat (поддержание LLM в \"горячем\" состоянии)"
 }

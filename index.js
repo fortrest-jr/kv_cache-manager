@@ -1,10 +1,11 @@
 import { eventSource, event_types } from "../../../../script.js";
 
-import { loadSettings, createSettingsHandlers, extensionFolderPath } from './settings.js';
+import { loadSettings, createSettingsHandlers, extensionFolderPath, getExtensionSettings } from './settings.js';
 import { onSaveButtonClick, onSaveNowButtonClick, onLoadButtonClick, onReleaseAllSlotsButtonClick, onSaveSlotButtonClick, onPreloadCharactersButtonClick } from './ui/ui.js';
 import { initializeSlots, updateSlotsList, redistributeCharacters, initializePreviousChatId } from './core/slot-manager.js';
 import { processMessageForAutoSave } from './core/auto-save.js';
 import { KVCacheManagerInterceptor, setSlotForGeneration } from './interceptors/generation-interceptor.js';
+import { startHeartbeat } from './core/heartbeat.js';
 
 jQuery(async () => {
     const settingsHtml = await $.get(`${extensionFolderPath}/settings.html`);
@@ -28,6 +29,7 @@ jQuery(async () => {
     $("#kv-cache-show-notifications").on("input", settingsHandlers.onShowNotificationsChange);
     $("#kv-cache-clear-on-chat-change").on("input", settingsHandlers.onClearOnChatChangeChange);
     $("#kv-cache-preload-timeout").on("input", settingsHandlers.onPreloadTimeoutChange);
+    $("#kv-cache-heartbeat").on("input", settingsHandlers.onHeartbeatChange);
     
     $("#kv-cache-save-button").on("click", onSaveButtonClick);
     $("#kv-cache-load-button").on("click", onLoadButtonClick);
@@ -37,5 +39,11 @@ jQuery(async () => {
     
     // Delegation for dynamic elements
     $(document).on("click", ".kv-cache-save-slot-button", onSaveSlotButtonClick);
+    
+    // Start heartbeat if enabled
+    const extensionSettings = getExtensionSettings();
+    if (extensionSettings.heartbeat) {
+        startHeartbeat();
+    }
     
 });

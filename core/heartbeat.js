@@ -44,40 +44,56 @@ export function setPreloadModeChecker(checker) {
  * Perform heartbeat generation - generate 1 token to keep LLM warm
  */
 async function performHeartbeat() {
+    showToast('info', 'Heartbeat: Starting check', 'Heartbeat Debug');
+    
     const extensionSettings = getExtensionSettings();
     if (!extensionSettings.heartbeat) {
+        showToast('warning', 'Heartbeat: Disabled in settings', 'Heartbeat Debug');
         return;
     }
+    showToast('info', 'Heartbeat: Enabled check passed', 'Heartbeat Debug');
 
     // Don't start new heartbeat if one is already running
     if (isHeartbeatGenerating) {
+        showToast('warning', 'Heartbeat: Already generating', 'Heartbeat Debug');
         return;
     }
+    showToast('info', 'Heartbeat: Not already generating', 'Heartbeat Debug');
 
     // Check if chat is not unknown
     const chatId = getNormalizedChatId();
     if (chatId === 'unknown') {
+        showToast('warning', 'Heartbeat: Chat is unknown', 'Heartbeat Debug');
         return;
     }
+    showToast('info', `Heartbeat: Chat ID is ${chatId}`, 'Heartbeat Debug');
 
     // Check if preload mode is active - don't run heartbeat during preload
     if (getPreloadingMode && getPreloadingMode()) {
+        showToast('warning', 'Heartbeat: Preload mode active', 'Heartbeat Debug');
         return;
     }
+    showToast('info', 'Heartbeat: Preload mode check passed', 'Heartbeat Debug');
 
     // Check if there are no active generations
-    if (await isGenerationInProgress()) {
+    const isGenerating = await isGenerationInProgress();
+    if (isGenerating) {
+        showToast('warning', 'Heartbeat: Generation in progress', 'Heartbeat Debug');
         return;
     }
+    showToast('info', 'Heartbeat: No active generation', 'Heartbeat Debug');
 
     // Check if we have a character in context
     const characterName = getNormalizedCharacterNameFromContext();
     if (!characterName) {
+        showToast('warning', 'Heartbeat: No character in context', 'Heartbeat Debug');
         return;
     }
+    showToast('info', `Heartbeat: Character found: ${characterName}`, 'Heartbeat Debug');
 
     // Start heartbeat generation
     isHeartbeatGenerating = true;
+    showToast('info', 'Heartbeat: Starting generation', 'Heartbeat Debug');
 
     try {
         // Generate 1 token quietly to keep LLM warm
@@ -85,12 +101,14 @@ async function performHeartbeat() {
             responseLength: 1
         });
         // Show success toast
-        showToast('success', t`Heartbeat: LLM kept warm`, t`Heartbeat`);
+        showToast('success', 'Heartbeat: LLM kept warm', 'Heartbeat');
     } catch (e) {
         // Silently ignore errors - heartbeat should not interrupt user experience
+        showToast('error', `Heartbeat: Generation error - ${e.message}`, 'Heartbeat Debug');
         console.debug('[KV Cache Manager] Heartbeat generation error (ignored):', e);
     } finally {
         isHeartbeatGenerating = false;
+        showToast('info', 'Heartbeat: Finished', 'Heartbeat Debug');
     }
 }
 

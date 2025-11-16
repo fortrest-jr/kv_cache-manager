@@ -1,7 +1,6 @@
 import { generateQuietPrompt } from "../../../../../script.js";
 
 import { getNormalizedChatId } from '../utils/utils.js';
-import { getNormalizedCharacterNameFromContext } from '../utils/character-utils.js';
 import { getExtensionSettings, LLAMA_HEARTBEAT_INTERVAL_MS } from '../settings.js';
 import { getAllSlotsInfo } from './slot-manager.js';
 import { showToast } from '../ui/ui.js';
@@ -53,12 +52,11 @@ async function performHeartbeat() {
     }
     showToast('info', 'Heartbeat: Enabled check passed', 'Heartbeat Debug');
 
-    // Don't start new heartbeat if one is already running
     if (isHeartbeatGenerating) {
-        showToast('warning', 'Heartbeat: Already generating', 'Heartbeat Debug');
+        showToast('warning', 'Heartbeat: Heartbeat generation in progress', 'Heartbeat Debug');
         return;
     }
-    showToast('info', 'Heartbeat: Not already generating', 'Heartbeat Debug');
+    showToast('info', 'Heartbeat: No heartbeat generation in progress', 'Heartbeat Debug');
 
     // Check if chat is not unknown
     const chatId = getNormalizedChatId();
@@ -75,21 +73,12 @@ async function performHeartbeat() {
     }
     showToast('info', 'Heartbeat: Preload mode check passed', 'Heartbeat Debug');
 
-    // Check if there are no active generations
     const isGenerating = await isGenerationInProgress();
     if (isGenerating) {
         showToast('warning', 'Heartbeat: Generation in progress', 'Heartbeat Debug');
         return;
     }
     showToast('info', 'Heartbeat: No active generation', 'Heartbeat Debug');
-
-    // Check if we have a character in context
-    const characterName = getNormalizedCharacterNameFromContext();
-    if (!characterName) {
-        showToast('warning', 'Heartbeat: No character in context', 'Heartbeat Debug');
-        return;
-    }
-    showToast('info', `Heartbeat: Character found: ${characterName}`, 'Heartbeat Debug');
 
     // Start heartbeat generation
     isHeartbeatGenerating = true;

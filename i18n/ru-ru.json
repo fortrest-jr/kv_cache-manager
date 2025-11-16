@@ -112,5 +112,7 @@
     "File not found for ${0}: ${1}": "Файл не найден для ${0}: ${1}",
     "File not found for ${0}": "Файл не найден для ${0}",
     "Error intercepting generation: ${0}": "Ошибка при перехвате генерации: ${0}",
-    "Heartbeat (keep LLM warm)": "Heartbeat (поддержание LLM в \"горячем\" состоянии)"
+    "Heartbeat (keep LLM warm)": "Heartbeat (поддержание LLM в \"горячем\" состоянии)",
+    "Heartbeat": "Heartbeat",
+    "Heartbeat: LLM kept warm": "Heartbeat: LLM поддерживается в \"горячем\" состоянии"
 }

@@ -4,6 +4,7 @@ import { getNormalizedChatId } from '../utils/utils.js';
 import { getNormalizedCharacterNameFromContext } from '../utils/character-utils.js';
 import { getExtensionSettings, LLAMA_HEARTBEAT_INTERVAL_MS } from '../settings.js';
 import { getAllSlotsInfo } from './slot-manager.js';
+import { showToast } from '../ui/ui.js';
 
 // Import to check preload mode
 let getPreloadingMode = null;
@@ -83,6 +84,8 @@ async function performHeartbeat() {
         await generateQuietPrompt({
             responseLength: 1
         });
+        // Show success toast
+        showToast('success', t`Heartbeat: LLM kept warm`, t`Heartbeat`);
     } catch (e) {
         // Silently ignore errors - heartbeat should not interrupt user experience
         console.debug('[KV Cache Manager] Heartbeat generation error (ignored):', e);

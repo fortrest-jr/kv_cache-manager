@@ -107,5 +107,9 @@
     "Cache for ${0} loaded": "Кеш для ${0} загружен",
     "Failed to load cache for ${0}": "Не удалось загрузить кеш для ${0}",
     "Error loading cache for ${0}: ${1}": "Ошибка при загрузке кеша для ${0}: ${1}",
+    "Error loading cache: ${0}": "Ошибка при загрузке кеша: ${0}",
+    "Cache for ${0} loaded successfully": "Кеш для ${0} успешно загружен",
+    "File not found for ${0}: ${1}": "Файл не найден для ${0}: ${1}",
+    "File not found for ${0}": "Файл не найден для ${0}",
     "Error intercepting generation: ${0}": "Ошибка при перехвате генерации: ${0}"
 }

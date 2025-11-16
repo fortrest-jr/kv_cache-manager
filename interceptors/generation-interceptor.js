@@ -1,4 +1,5 @@
 import { getContext } from "../../../../extensions.js";
+import { t } from '../../../../i18n.js';
 
 import { formatTimestampToDate } from '../utils/utils.js';
 import { getSlotsState, acquireSlot } from '../core/slot-manager.js';
@@ -73,19 +74,7 @@ export async function KVCacheManagerInterceptor(chat, contextSize, abort, type) 
                 const cacheInfo = await getLastCacheForCharacter(characterName, true); // Only from current chat
                 
                 if (cacheInfo) {
-                    const loaded = await loadSlotCache(currentSlot, cacheInfo.filename);
-                    
-                    if (loaded) {
-                        const parsed = parseSaveFilename(cacheInfo.filename);
-                        if (parsed && parsed.timestamp) {
-                            const dateTimeStr = formatTimestampToDate(parsed.timestamp);
-                            showToast('success', t`Cache for ${characterName} loaded (${dateTimeStr})`, t`Generation`);
-                        } else {
-                            showToast('success', t`Cache for ${characterName} loaded`, t`Generation`);
-                        }
-                    } else {
-                        showToast('warning', t`Failed to load cache for ${characterName}`, t`Generation`);
-                    }
+                    await loadSlotCache(currentSlot, cacheInfo.filename, characterName);
                 }
             } catch (e) {
                 console.error(`[KV Cache Manager] Error loading cache for character ${characterName}:`, e);

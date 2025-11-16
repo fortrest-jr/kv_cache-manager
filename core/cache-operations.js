@@ -4,6 +4,7 @@ import { generateSaveFilename, rotateCharacterFiles, validateCacheFile } from '.
 import { getAllSlotsInfo, getSlotsState, resetSlotUsage, setSlotCacheLoaded, getSlotsCountFromData, updateSlotsList } from './slot-manager.js';
 import { showToast, disableAllSaveButtons, enableAllSaveButtons, showTagInputPopup } from '../ui/ui.js';
 import { getExtensionSettings, MIN_USAGE_FOR_SAVE } from '../settings.js';
+import { t } from '../../../../i18n.js';
 
 const llamaApi = new LlamaApi();
 
@@ -42,9 +43,10 @@ export async function saveSlotCache(slotId, filename, characterName) {
  * Load cache for slot
  * @param {number} slotId - Slot index
  * @param {string} filename - Filename to load
+ * @param {string} characterName - Character name (for notifications)
  * @returns {Promise<boolean>} true if loaded successfully
  */
-export async function loadSlotCache(slotId, filename) {
+export async function loadSlotCache(slotId, filename, characterName) {
     try {
         await llamaApi.loadSlotCache(slotId, filename);
         
@@ -54,9 +56,21 @@ export async function loadSlotCache(slotId, filename) {
         
         updateSlotsList();
         
+        showToast('success', t`Cache for ${characterName} loaded successfully`, t`Cache Loading`);
+        
         return true;
     } catch (e) {
         console.error(`[KV Cache Manager] Error loading cache for slot ${slotId}:`, e);
+        
+        const errorMessage = e.message || 'Unknown error';
+        const isFileNotFound = errorMessage.includes('404');
+        
+        if (isFileNotFound) {
+            showToast('warning', t`File not found for ${characterName}: ${filename}`, t`Cache Loading`);
+        } else {
+            showToast('error', t`Error loading cache for ${characterName}: ${errorMessage}`, t`Cache Loading`);
+        }
+        
         return false;
     }
 }

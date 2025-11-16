@@ -370,8 +370,6 @@ export async function loadSelectedCache() {
         return;
     }
     
-    showToast('info', t`Starting cache load for ${Object.keys(selectedCharacters).length} characters...`, t`Loading`);
-    
     const extensionSettings = getExtensionSettings();
     
     // Step 1: Prepare selected character data and create Set of protected characters
@@ -385,7 +383,8 @@ export async function loadSelectedCache() {
         const fileToLoad = characterFiles.find(f => f.timestamp === selectedTimestamp);
         
         if (!fileToLoad) {
-                errors.push(`${characterName}: file not found`);
+            const errorMsg = `${characterName}: file not found`;
+            errors.push(errorMsg);
             continue;
         }
         
@@ -397,7 +396,7 @@ export async function loadSelectedCache() {
     }
     
     if (charactersToLoad.length === 0) {
-        showToast('error', 'No files found for loading');
+        showToast('error', 'No files found for loading', t`Loading`);
         return;
     }
     
@@ -433,28 +432,18 @@ export async function loadSelectedCache() {
         }
         
         try {
-            const loaded = await loadSlotCache(slotIndex, character.fileToLoad.filename);
+            const loaded = await loadSlotCache(slotIndex, character.fileToLoad.filename, character.characterName);
             
             if (loaded) {
                 loadedCount++;
-                
-                const parsed = parseSaveFilename(character.fileToLoad.filename);
-                
-                const dateTimeStr = formatTimestampToDate(character.fileToLoad.timestamp);
-                
-                const currentChatId = getNormalizedChatId();
-                const cacheChatId = parsed?.chatId;
-                const chatInfo = cacheChatId && cacheChatId !== currentChatId ? ` (from chat ${cacheChatId})` : '';
-                
-                if (extensionSettings.showNotifications) {
-                    showToast('success', t`Loaded cache for ${character.characterName} (${dateTimeStr})${chatInfo}`, t`Cache Loading`);
-                }
             } else {
-                errors.push(t`${character.characterName}: load error`);
+                const errorMsg = t`${character.characterName}: load error`;
+                errors.push(errorMsg);
             }
         } catch (e) {
             console.error(`[KV Cache Manager] Error loading cache for character ${character.characterName}:`, e);
-            errors.push(`${character.characterName}: ${e.message}`);
+            const errorMsg = `${character.characterName}: ${e.message}`;
+            errors.push(errorMsg);
         }
     }
     

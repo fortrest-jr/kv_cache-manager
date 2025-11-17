@@ -33,7 +33,11 @@ export async function getAllSlotsInfo() {
     } catch (e) {
         console.error('[KV Cache Manager] Error getting slot information:', e);
         const errorMessage = e.message || String(e);
-        showToast('error', t`Error getting slot information: ${errorMessage}`);
+        const isTimeout = errorMessage.includes('timeout') || errorMessage.includes('Timeout');
+        if (!isTimeout) {
+            //It happens too often while generation is in progress
+            showToast('error', t`Error getting slot information: ${errorMessage}`);
+        }
         return null;
     }
 }

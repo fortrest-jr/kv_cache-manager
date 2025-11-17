@@ -209,14 +209,7 @@ export async function onSaveSlotButtonClick(event) {
     button.attr('title', t`Saving...`);
     
     try {
-        showToast('info', t`Saving cache for ${characterName}...`, t`Saving Slot`);
-        const success = await saveCharacterCache(characterName, slotIndex);
-        
-        if (success) {
-            showToast('success', t`Cache for ${characterName} saved successfully`, t`Saving Slot`);
-        } else {
-            showToast('error', t`Failed to save cache for ${characterName}`, t`Saving Slot`);
-        }
+        await saveCharacterCache(characterName, slotIndex);
     } catch (e) {
         console.error(`[KV Cache Manager] Error saving slot ${slotIndex}:`, e);
         showToast('error', t`Error saving: ${e.message}`, t`Saving Slot`);

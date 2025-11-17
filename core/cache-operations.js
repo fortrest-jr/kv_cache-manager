@@ -216,8 +216,6 @@ export async function saveCache(requestTag = false) {
     
     const chatId = getNormalizedChatId();
     
-    showToast('info', t`Starting cache save...`);
-    
     const slotsState = getSlotsState();
     const charactersToSave = [];
     

@@ -1,4 +1,5 @@
 import { generateQuietPrompt } from "../../../../../script.js";
+import { t } from '../../../../i18n.js';
 
 import { getNormalizedChatId } from '../utils/utils.js';
 import { getExtensionSettings } from '../settings.js';

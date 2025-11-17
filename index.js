@@ -30,6 +30,7 @@ jQuery(async () => {
     $("#kv-cache-clear-on-chat-change").on("input", settingsHandlers.onClearOnChatChangeChange);
     $("#kv-cache-preload-timeout").on("input", settingsHandlers.onPreloadTimeoutChange);
     $("#kv-cache-heartbeat").on("input", settingsHandlers.onHeartbeatChange);
+    $("#kv-cache-show-heartbeat-notifications").on("input", settingsHandlers.onShowHeartbeatNotificationsChange);
     
     $("#kv-cache-save-button").on("click", onSaveButtonClick);
     $("#kv-cache-load-button").on("click", onLoadButtonClick);

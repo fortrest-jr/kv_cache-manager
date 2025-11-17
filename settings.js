@@ -14,7 +14,8 @@ export const defaultSettings = {
     showNotifications: true,
     clearOnChatChange: true,
     preloadTimeout: 20,
-    heartbeat: 0
+    heartbeat: 0,
+    showHeartbeatNotifications: false
 };
 
 export const MIN_FILE_SIZE_MB = 1;
@@ -58,6 +59,7 @@ export async function loadSettings() {
     $("#kv-cache-clear-on-chat-change").prop("checked", extensionSettings.clearOnChatChange).trigger("input");
     $("#kv-cache-preload-timeout").val(extensionSettings.preloadTimeout).trigger("input");
     $("#kv-cache-heartbeat").val(extensionSettings.heartbeat).trigger("input");
+    $("#kv-cache-show-heartbeat-notifications").prop("checked", extensionSettings.showHeartbeatNotifications).trigger("input");
     
     updateSlotsList();
 }
@@ -117,6 +119,12 @@ export function createSettingsHandlers() {
         }
     }
     
+    function onShowHeartbeatNotificationsChange(event) {
+        const value = Boolean($(event.target).prop("checked"));
+        extensionSettings.showHeartbeatNotifications = value;
+        saveSettingsDebounced();
+    }
+    
     return {
         onEnabledChange,
         onSaveIntervalChange,
@@ -124,7 +132,8 @@ export function createSettingsHandlers() {
         onShowNotificationsChange,
         onClearOnChatChangeChange,
         onPreloadTimeoutChange,
-        onHeartbeatChange
+        onHeartbeatChange,
+        onShowHeartbeatNotificationsChange
     };
 }
 

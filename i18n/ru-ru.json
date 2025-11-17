@@ -114,6 +114,7 @@
     "Error intercepting generation: ${0}": "Ошибка при перехвате генерации: ${0}",
     "Heartbeat (keep LLM warm)": "Heartbeat (поддержание LLM в \"горячем\" состоянии)",
     "Heartbeat interval (seconds, 0 = disabled):": "Интервал heartbeat (секунды, 0 = выключено):",
+    "Show Heartbeat Notifications": "Показывать уведомления heartbeat",
     "Heartbeat": "Heartbeat",
     "Heartbeat: LLM kept warm": "Heartbeat: LLM поддерживается в \"горячем\" состоянии",
     "Heartbeat: Generation error - ${0}": "Heartbeat: Ошибка генерации - ${0}"

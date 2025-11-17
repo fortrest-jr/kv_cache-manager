@@ -69,9 +69,14 @@ async function performHeartbeat() {
         await generateQuietPrompt({
             responseLength: 1
         });
-        showToast('success', t`Heartbeat: LLM kept warm`, 'Heartbeat');
+        
+        if (extensionSettings.showHeartbeatNotifications) {
+            showToast('success', t`Heartbeat: LLM kept warm`, 'Heartbeat');
+        }
     } catch (e) {
-        showToast('error', t`Heartbeat: Generation error - ${e.message}`, 'Heartbeat');
+        if (extensionSettings.showHeartbeatNotifications) {
+            showToast('error', t`Heartbeat: Generation error - ${e.message}`, 'Heartbeat');
+        }
         console.debug('[KV Cache Manager] Heartbeat generation error (ignored):', e);
     } finally {
         isHeartbeatGenerating = false;

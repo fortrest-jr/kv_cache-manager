@@ -60,7 +60,8 @@ export async function processMessageForAutoSave(data) {
     
     if (shouldIncrement) {
         incrementSlotUsage(slotIndex);
-        const newUsage = slot.usage;
+        const updatedSlot = getSlotsState()[slotIndex];
+        const newUsage = updatedSlot?.usage;
         
         await checkAndPerformAutoSave(slotIndex, newUsage);
         
